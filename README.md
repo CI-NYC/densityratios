@@ -18,11 +18,11 @@ pixi run test
 
 ## Related Software
 
-    * python KLIEP [github.com/srome/pykliep](https://github.com/srome/pykliep)
-    * python uLSIF [github.com/hoxo-m/densratio_py](https://github.com/hoxo-m/densratio_py)
-    * python uLSIF [github.com/JohnYKiyo/density_ratio_estimation](https://github.com/JohnYKiyo/density_ratio_estimation)
-    * python [github.com/ermongroup/dre-infinity](https://github.com/ermongroup/dre-infinity)
-    * python [github.com/ermongroup/f-dre](https://github.com/ermongroup/f-dre).
-    * matlab (https://www.ms.k.u-tokyo.ac.jp/sugi/software.html).
-    * R (using C++) uLSIF, KLIEP, KMM, LSHH, spectral methods [github.com/thomvolker/densityratio](https://github.com/thomvolker/densityratio) also available on [CRAN]( https://CRAN.R-project.org/package=densityratio).
-    * R uLSIF and KLIEP [github.com/hoxo-m/densratio](https://github.com/hoxo-m/densratio) also on [CRAN](https://CRAN.R-project.org/package=densratio)
+* python KLIEP [github.com/srome/pykliep](https://github.com/srome/pykliep)
+* python uLSIF [github.com/hoxo-m/densratio_py](https://github.com/hoxo-m/densratio_py)
+* python uLSIF [github.com/JohnYKiyo/density_ratio_estimation](https://github.com/JohnYKiyo/density_ratio_estimation)
+* python [github.com/ermongroup/dre-infinity](https://github.com/ermongroup/dre-infinity)
+* python [github.com/ermongroup/f-dre](https://github.com/ermongroup/f-dre).
+* matlab (https://www.ms.k.u-tokyo.ac.jp/sugi/software.html).
+* R (using C++) uLSIF, KLIEP, KMM, LSHH, spectral methods [github.com/thomvolker/densityratio](https://github.com/thomvolker/densityratio) also available on [CRAN]( https://CRAN.R-project.org/package=densityratio).
+* R uLSIF and KLIEP [github.com/hoxo-m/densratio](https://github.com/hoxo-m/densratio) also on [CRAN](https://CRAN.R-project.org/package=densratio)
