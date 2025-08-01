@@ -1,0 +1,48 @@
+[project]
+name = "density_ratios"
+description = "Package to estimate density ratios."
+channels = ["conda-forge"]
+platforms = ["osx-arm64"]
+
+[tasks]
+postinstall = "uv pip install --no-build-isolation --no-deps -e ."
+
+[dependencies]
+python = "*"
+numpy = "*"
+jax = "*"
+lightgbm = "*"
+altair = "*"
+polars = "*"
+pytorch = "*"
+pyyaml = "*"
+tqdm = "*"
+rich = "*"
+osqp = "*"
+
+[host-dependencies]
+uv = "*"
+
+[feature.test.dependencies]
+pytest = "*"
+pytest-cov = "*"
+pytest-md = "*"
+pytest-emoji = "*"
+[feature.test.tasks]
+test = "pytest"
+
+[feature.lint.dependencies]
+pre-commit = "*"
+docformatter = "*"
+ruff = "*"
+prettier = "*"
+taplo = "*"
+pre-commit-hooks = "*"
+typos = "*"
+[feature.lint.tasks]
+pre-commit-install = "pre-commit install"
+pre-commit-run = "pre-commit run -a"
+
+[environments]
+default = ["test"]
+lint = { features = ["lint"], no-default-feature = true }
