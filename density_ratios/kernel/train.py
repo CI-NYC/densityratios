@@ -12,6 +12,7 @@ def train(
     weights,
     params,
     objective=None,  # Not used in this implementation
+    verbose: bool = False,
 ) -> KernelModel:
     """Train the model using the provided data."""
     x0 = x[y == 0, :]
@@ -29,7 +30,6 @@ def train(
     bandwidths = params.get("bandwidths", [1, 2])
     basis_dimensions = params.get("basis_dimensions", [100])
     smoothing_parameters = params.get("smoothing_parameters", [0.0])
-    verbose = params.get("verbose", False)
 
     if method == "uLSIF":
         model = train_ulsif(
