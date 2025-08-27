@@ -45,13 +45,13 @@ class MLP(nn.Module):
 
 
 class EarlyStopper:
-    def __init__(self, patience, min_delta):
+    def __init__(self, patience: int, min_delta: float):
         self.patience = patience
         self.min_delta = min_delta
         self.counter = 0
         self.best_loss = float("inf")
 
-    def update(self, validation_loss):
+    def update(self, validation_loss: float) -> bool:
         # improvement of less than min_delta, will count as no improvement
         if validation_loss < self.best_loss - self.min_delta:
             self.best_loss = validation_loss
@@ -59,10 +59,7 @@ class EarlyStopper:
             return False
 
         self.counter += 1
-        if self.counter <= self.patience:
-            return False
-
-        return True
+        return self.counter > self.patience
 
 
 def train(
