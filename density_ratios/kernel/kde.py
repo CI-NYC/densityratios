@@ -43,6 +43,7 @@ def train_kde(
     weights,
     params,
     objective=None,  # Not used in this implementation
+    verbose: bool = False,
 ) -> KDERatio:
     bw_method = params.get("bandwidth_method", "scott")
     stabalized_weight = params.get("stabalized_weight", False)

@@ -77,6 +77,7 @@ def train(
     y_valid=None,
     x_valid=None,
     weights_valid=None,
+    verbose: bool = False,
 ) -> MLP:
     """Perform the training with given parameters.
 
@@ -106,7 +107,6 @@ def train(
     batch_size = params.get("batch_size", 32)
     learning_rate = params.get("learning_rate", 1e-3)
     num_iterations = params.get("num_iterations", 100)
-    verbose = params.get("verbose", False)
 
     nnet = MLP(depth=depth, input_dim=n_features, hidden_dim=width, output_dim=1)
     train_set = TensorDataset(

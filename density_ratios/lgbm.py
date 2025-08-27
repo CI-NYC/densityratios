@@ -53,6 +53,7 @@ def train(
     y_valid=None,
     x_valid=None,
     weights_valid=None,
+    verbose: bool = False,
 ) -> lgb.Booster:
     """Perform the training with given parameters.
 
@@ -73,7 +74,6 @@ def train(
     _params = params.copy()
     _params.pop("model", None)
     _params["objective"] = _grad_hess_lgb(objective)
-    verbose = _params.get("verbose", False)
     _params["verbose"] = int(verbose)
 
     train_set = lgb.Dataset(
