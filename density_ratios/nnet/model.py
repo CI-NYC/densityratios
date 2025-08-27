@@ -15,9 +15,15 @@ class MLP(nn.Module):
     """Multi Layer Perceptron"""
 
     def __init__(
-        self, depth: int, input_dim: int, hidden_dim: int, output_dim: int = 1
+        self,
+        depth: int,
+        input_dim: int,
+        hidden_dim: int | None = None,
+        output_dim: int = 1,
     ):
         super().__init__()
+        hidden_dim = hidden_dim or input_dim
+
         if depth < 1:
             raise ValueError(f"Depth must be at least 1, got {depth=}")
 
@@ -36,6 +42,27 @@ class MLP(nn.Module):
     def predict(self, x):
         """Forward pass with numpy as input/output."""
         return self.forward(torch.as_tensor(x)).detach().numpy().squeeze()
+
+
+class EarlyStopper:
+    def __init__(self, patience, min_delta):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.counter = 0
+        self.best_loss = float("inf")
+
+    def update(self, validation_loss):
+        # improvement of less than min_delta, will count as no improvement
+        if validation_loss < self.best_loss - self.min_delta:
+            self.best_loss = validation_loss
+            self.counter = 0
+            return False
+
+        self.counter += 1
+        if self.counter <= self.patience:
+            return False
+
+        return True
 
 
 def train(
@@ -67,7 +94,7 @@ def train(
     nnet : MLP
         The trained Multi Layer Perceptron.
     """
-
+    objective_name = objective.__class__.__name__
     n_features = x.shape[1]
 
     # parse parameter
@@ -88,12 +115,15 @@ def train(
 
     # Early stopping setup
     early_stopping = (
-        x_valid is not None and y_valid is not None and weights_valid is not None
+        (y_valid is not None) and (x_valid is not None) and (weights_valid is not None)
     )
+    early_stopping &= params.get("early_stopping", True)
+
     if early_stopping:
-        patience = params.get("early_stopping_patience", 10)
-        best_loss = float("inf")
-        epochs_no_improvement = 0
+        stopper = EarlyStopper(
+            patience=params.get("early_stopping_round", 0),
+            min_delta=params.get("early_stopping_min_delta", 0.0),
+        )
 
         x_valid_tensor = torch.as_tensor(x_valid)
         y_valid_tensor = torch.as_tensor(y_valid)
@@ -109,19 +139,20 @@ def train(
             optimizer.step()
 
         if verbose:
-            logger.info(f"Epoch {epoch + 1}, Loss: {loss.item():.4f}")
+            logger.info(
+                f"Epoch {epoch + 1}, Loss ({objective_name}): {loss.item():.4f}"
+            )
 
         if early_stopping:
             preds_valid = nnet(x_valid_tensor)
             loss_valid = objective.loss_torch(
                 preds_valid, y_valid_tensor, weights_valid_tensor
             ).item()
-            if loss_valid < best_loss:
-                epochs_no_improvement = 0
-                best_loss = loss_valid
-            elif epochs_no_improvement >= patience:
-                break
-            else:
-                epochs_no_improvement += 1
+            stop_yn = stopper.update(loss_valid)
+            if stop_yn:
+                logger.info(
+                    f"Stopping at Epoch {epoch + 1}, Validation Loss ({objective_name}): {loss_valid:.4f}"
+                )
+                return nnet
 
     return nnet

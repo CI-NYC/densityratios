@@ -14,13 +14,20 @@ def train(
     model: str,
     params: dict[str, Any],
     objective: DensityRatioObjective | None = None,
+    y_valid=None,
+    x_valid=None,
+    weights_valid=None,
 ):
     """Dispatch to training function according to 'model'."""
     if model == "lgb":
-        return train_lgb(y, x, weights, params, objective)
+        return train_lgb(
+            y, x, weights, params, objective, y_valid, x_valid, weights_valid
+        )
 
     if model == "nnet":
-        return train_nnet(y, x, weights, params, objective)
+        return train_nnet(
+            y, x, weights, params, objective, y_valid, x_valid, weights_valid
+        )
 
     if model == "kde":
         return train_kde(y, x, weights, params, objective)

@@ -17,7 +17,7 @@ class DensityRatioObjective(ABC):
         self,
         raw_predictions: ArrayLike,
         delta: ArrayLike,
-        weights: ArrayLike | None = None,
+        weight: ArrayLike | None = None,
     ) -> Array:
         """Calculate the loss based on raw predictions, delta, and optional weights."""
 
@@ -48,28 +48,28 @@ class LeastSquares(DensityRatioObjective):
         self,
         raw_predictions: ArrayLike,
         delta: ArrayLike,
-        weights: ArrayLike | None = None,
+        weight: ArrayLike | None = None,
     ) -> Array:
         """Calculate the least squares loss."""
         raw_predictions = jnp.asarray(raw_predictions)
         delta = jnp.asarray(delta, dtype=np.bool_)
         dr_preds = jnp.exp(raw_predictions)
         losses = jnp.where(delta, -2.0 * dr_preds, jnp.square(dr_preds))
-        return jnp.average(losses, weights=weights)
+        return jnp.average(losses, weights=weight)
 
     def loss_torch(
         self,
         raw_predictions,
         delta,
-        weights=None,
+        weight=None,
     ):
         raw_predictions = torch.as_tensor(raw_predictions)
         delta = torch.as_tensor(delta, dtype=torch.bool)
         dr_preds = torch.exp(raw_predictions)
-        losses = torch.where(delta, -2.0 * dr_preds, dr_preds**2)
-        if weights is not None:
-            weights = torch.as_tensor(weights, dtype=losses.dtype)
-            return torch.sum(losses * weights) / torch.sum(weights)
+        losses = torch.where(delta, -2.0 * dr_preds, torch.square(dr_preds))
+        if weight is not None:
+            weight = torch.as_tensor(weight, dtype=losses.dtype)
+            return torch.sum(losses * weight) / torch.sum(weight)
         return torch.mean(losses)
 
     def grad_hess(
@@ -95,27 +95,26 @@ class KullbackLeibler(DensityRatioObjective):
         self,
         raw_predictions: ArrayLike,
         delta: ArrayLike,
-        weights: ArrayLike | None = None,
+        weight: ArrayLike | None = None,
     ) -> Array:
         """Calculate the least squares loss."""
         raw_predictions = jnp.asarray(raw_predictions)
         delta = jnp.asarray(delta)
         losses = jnp.where(delta, -raw_predictions, jnp.exp(raw_predictions))
-        return jnp.average(losses, weights=weights)
+        return jnp.average(losses, weights=weight)
 
     def loss_torch(
         self,
         raw_predictions,
         delta,
-        weights=None,
+        weight=None,
     ):
         raw_predictions = torch.as_tensor(raw_predictions)
         delta = torch.as_tensor(delta, dtype=torch.bool)
-        dr_preds = torch.exp(raw_predictions)
-        losses = torch.where(delta, -2.0 * dr_preds, dr_preds**2)
-        if weights is not None:
-            weights = torch.as_tensor(weights, dtype=losses.dtype)
-            return torch.sum(losses * weights) / torch.sum(weights)
+        losses = torch.where(delta, -raw_predictions, torch.exp(raw_predictions))
+        if weight is not None:
+            weight = torch.as_tensor(weight, dtype=losses.dtype)
+            return torch.sum(losses * weight) / torch.sum(weight)
         return torch.mean(losses)
 
     def grad_hess(
@@ -140,28 +139,28 @@ class BinaryCrossEntropy(DensityRatioObjective):
         self,
         raw_predictions: ArrayLike,
         delta: ArrayLike,
-        weights: ArrayLike | None = None,
+        weight: ArrayLike | None = None,
     ) -> Array:
         """Calculate the least squares loss."""
         raw_predictions = jnp.asarray(raw_predictions)
         delta = jnp.asarray(delta, dtype=np.bool_)
         losses = jax.nn.softplus(jnp.where(delta, -raw_predictions, raw_predictions))
-        return jnp.average(losses, weights=weights)
+        return jnp.average(losses, weights=weight)
 
     def loss_torch(
         self,
         raw_predictions,
         delta,
-        weights=None,
+        weight=None,
     ):
         raw_predictions = torch.as_tensor(raw_predictions)
         delta = torch.as_tensor(delta, dtype=torch.bool)
         losses = torch.nn.functional.softplus(
             torch.where(delta, -raw_predictions, raw_predictions)
         )
-        if weights is not None:
-            weights = torch.as_tensor(weights, dtype=losses.dtype)
-            return torch.sum(losses * weights) / torch.sum(weights)
+        if weight is not None:
+            weight = torch.as_tensor(weight, dtype=losses.dtype)
+            return torch.sum(losses * weight) / torch.sum(weight)
         return torch.mean(losses)
 
     def grad_hess(

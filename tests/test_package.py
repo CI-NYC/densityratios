@@ -142,3 +142,21 @@ def test_kde_training(augmented_data, test_data):
     a, x = test_data
     preds = model.predict(np.column_stack([a, x]))
     assert preds.shape == (len(a),)
+
+
+@pytest.mark.parametrize(
+    "objective", [BinaryCrossEntropy, KullbackLeibler, LeastSquares]
+)
+def test_torch_jax_losses(objective):
+    key = jax.random.PRNGKey(112358)
+    key1, key2, key3 = jax.random.split(key, 3)
+    n = 100
+    a = jax.random.gamma(key1, 1.0, shape=n)
+    d = jax.random.bernoulli(key2, p=0.5, shape=n)
+    w = jax.random.gamma(key3, 1.0, shape=n)
+
+    obj = objective()
+    loss_jax = obj.loss(a, d, w).item()
+    loss_torch = obj.loss_torch(a, d, w).item()
+
+    assert jnp.abs(loss_jax - loss_torch) <= 1.0e-6
