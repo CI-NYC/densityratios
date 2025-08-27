@@ -1,5 +1,6 @@
 from typing import Any
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -39,9 +40,12 @@ class MLP(nn.Module):
     def forward(self, x: Tensor) -> Tensor:
         return self.net(x)
 
-    def predict(self, x):
+    def predict(self, x, log: bool = True):
         """Forward pass with numpy as input/output."""
-        return self.forward(torch.as_tensor(x)).detach().numpy().squeeze()
+        preds = self.forward(torch.as_tensor(x)).detach().numpy().squeeze()
+        if log:
+            return preds
+        return np.exp(preds)
 
 
 class EarlyStopper:
@@ -50,8 +54,10 @@ class EarlyStopper:
         self.min_delta = min_delta
         self.counter = 0
         self.best_loss = float("inf")
+        self.losses: list[float] = []
 
     def update(self, validation_loss: float) -> bool:
+        self.losses.append(validation_loss)
         # improvement of less than min_delta, will count as no improvement
         if validation_loss < self.best_loss - self.min_delta:
             self.best_loss = validation_loss
@@ -144,8 +150,8 @@ def train(
             preds_valid = nnet(x_valid_tensor)
             loss_valid = objective.loss_torch(
                 preds_valid, y_valid_tensor, weights_valid_tensor
-            ).item()
-            stop_yn = stopper.update(loss_valid)
+            )
+            stop_yn = stopper.update(loss_valid.item())
             if stop_yn:
                 logger.info(
                     f"Stopping at Epoch {epoch + 1}, Validation Loss ({objective_name}): {loss_valid:.4f}"
