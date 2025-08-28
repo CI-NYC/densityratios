@@ -54,7 +54,7 @@ def train(
     x_valid=None,
     weights_valid=None,
     verbose: bool = False,
-) -> lgb.Booster:
+) -> DensityRatioBooster:
     """Perform the training with given parameters.
 
     Parameters
