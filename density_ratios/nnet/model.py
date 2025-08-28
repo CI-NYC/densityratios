@@ -153,9 +153,10 @@ def train(
             )
             stop_yn = stopper.update(loss_valid.item())
             if stop_yn:
-                logger.info(
-                    f"Stopping at Epoch {epoch + 1}, Validation Loss ({objective_name}): {loss_valid:.4f}"
-                )
+                if verbose:
+                    logger.info(
+                        f"Stopping at Epoch {epoch + 1}, Validation Loss ({objective_name}): {loss_valid:.4f}"
+                    )
                 return nnet
 
     return nnet

@@ -25,7 +25,7 @@ def _postprocess_augmented_data(
     return delta, np.column_stack([a, x]), w
 
 
-def augment_stabalized_weights(
+def augment_stabilized_weights(
     x: ArrayLike,
     a: ArrayLike,
     weight: ArrayLike | None = None,
