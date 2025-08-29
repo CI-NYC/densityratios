@@ -86,9 +86,11 @@ def augment_stabilized_weights(
 
     if method == "empirical":
         for i, a_val in enumerate(a):
+            delta = np.ones_like(a, dtype=np.bool)
+            delta[i] = False
             arrs_augmented.append(
                 [
-                    np.ones_like(a, dtype=np.bool).at[i].set(False),  # D
+                    delta,  # D
                     np.broadcast_to(a_val, a.shape),  # A
                     x,  # X
                 ]

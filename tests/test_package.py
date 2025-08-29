@@ -149,15 +149,35 @@ def test_kde_training(augmented_data, test_data, stabilized_weight):
     "objective", [BinaryCrossEntropy, KullbackLeibler, LeastSquares]
 )
 def test_torch_jax_losses(objective):
+    # test Jax implementation and pytorch implementations agree
     key = jax.random.PRNGKey(112358)
     key1, key2, key3 = jax.random.split(key, 3)
     n = 100
-    a = jax.random.gamma(key1, 1.0, shape=n)
+    y = jax.random.gamma(key1, 1.0, shape=n)
     d = jax.random.bernoulli(key2, p=0.5, shape=n)
     w = jax.random.gamma(key3, 1.0, shape=n)
 
     obj = objective()
-    loss_jax = obj.loss(a, d, w).item()
-    loss_torch = obj.loss_torch(a, d, w).item()
+    loss_jax = obj.loss(y, d, w).item()
+    loss_torch = obj.loss_torch(y, d, w).item()
 
     assert jnp.abs(loss_jax - loss_torch) <= 1.0e-6
+
+
+@pytest.mark.parametrize(
+    "objective", [BinaryCrossEntropy, KullbackLeibler, LeastSquares]
+)
+def test_losses_grad(objective):
+    # test derivative code agrees with auto diff
+    key = jax.random.PRNGKey(112358)
+    key1, key2, key3 = jax.random.split(key, 3)
+    n = 100
+    y = jax.random.gamma(key1, 1.0, shape=n)
+    d = jax.random.bernoulli(key2, p=0.5, shape=n)
+    w = jax.random.gamma(key3, 1.0, shape=n)
+
+    obj = objective()
+    auto_grads = jax.grad(obj.loss)(y, d, w)
+    manual_grads, _ = obj.grad_hess(y, d, w)
+
+    assert jnp.abs(auto_grads - manual_grads).max() <= 1.0e-6

@@ -87,7 +87,8 @@ class LeastSquares(DensityRatioObjective):
         if weight is None:
             return np.asarray(grad), np.asarray(hess)
 
-        return weight * np.asarray(grad), weight * np.asarray(hess)
+        w = jnp.asarray(weight) / jnp.sum(weight)
+        return w * jnp.asarray(grad), w * jnp.asarray(hess)
 
 
 class KullbackLeibler(DensityRatioObjective):
@@ -131,7 +132,8 @@ class KullbackLeibler(DensityRatioObjective):
         if weight is None:
             return np.asarray(grad), np.asarray(hess)
 
-        return weight * np.asarray(grad), weight * np.asarray(hess)
+        w = jnp.asarray(weight) / jnp.sum(weight)
+        return w * jnp.asarray(grad), w * jnp.asarray(hess)
 
 
 class BinaryCrossEntropy(DensityRatioObjective):
@@ -175,6 +177,7 @@ class BinaryCrossEntropy(DensityRatioObjective):
         hess = sig * (1 - sig)
 
         if weight is None:
-            return np.asarray(grad), np.asarray(hess)
+            return jnp.asarray(grad), jnp.asarray(hess)
 
-        return weight * np.asarray(grad), weight * np.asarray(hess)
+        w = jnp.asarray(weight) / jnp.sum(weight)
+        return w * jnp.asarray(grad), w * jnp.asarray(hess)
