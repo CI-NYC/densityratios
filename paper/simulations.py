@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import altair as alt
+import click
 import jax
 import numpy as np
 import polars as pl
@@ -221,17 +222,32 @@ def run_simulations(
     return pl.from_records(outputs)
 
 
-def main():
-    experiment_name = "shift"
-    key = jax.random.PRNGKey(123)
+@click.group()
+def cli():
+    """Main CLI group"""
+    pass
+
+
+@cli.command()
+@click.option("--model-file", default="shift.yaml", help="Name of the model file.")
+@click.option("--num-simulations", default=200, help="Number of dataset replicates.")
+@click.option("--num-samples", default=2_000, help="Number of training observations.")
+@click.option("--num-test-samples", default=10_000, help="Number of test observations.")
+@click.option("--seed", default=123, help="Random seed.")
+def simulations(model_file, num_simulations, num_samples, num_test_samples, seed: int):
+    experiment_name = model_file.removesuffix(".yaml")
+    experiment_name = f"{experiment_name}_{num_samples}"
+    key = jax.random.PRNGKey(seed)
     results = run_simulations(
-        MODEL_DIR / "shift.yaml",
+        MODEL_DIR / model_file,
         key,
-        num_simulations=50,
-        num_samples=2000,
-        num_test_samples=10_000,
+        num_simulations=num_simulations,
+        num_samples=num_samples,
+        num_test_samples=num_test_samples,
     )
-    results.write_parquet(RESULTS_DIR / f"experiment_{experiment_name}.parquet")
+    results_file = RESULTS_DIR / f"experiment_{experiment_name}.parquet"
+    results.write_parquet(results_file)
+    logger.info(f"Simulation results written to: {str(results_file.resolve())}")
 
     name_as_list = pl.col("variable").str.split("_")
     res = (
@@ -245,15 +261,15 @@ def main():
             stat=name_as_list.list.get(-2),
             value=pl.col("value"),
         )
+        .with_columns(value_3sf=pl.col("value").round_sig_figs(3))
         .sort(["scale", "stat", "value"])
     )
-    res.write_parquet(RESULTS_DIR / f"results_{experiment_name}.parquet")
+    res_file = RESULTS_DIR / f"results_{experiment_name}.parquet"
+    res.write_parquet(res_file)
+    logger.info(f"Simulation results summary written to: {str(res_file.resolve())}")
 
-    # with pl.Config(tbl_rows=-1):
-    #     xx = res.filter(pl.col("stat") == "mae", pl.col("scale") == "ratio").with_columns(pl.col("value").round_sig_figs(3))
-    #     yy = res.filter(pl.col("stat") == "mae", pl.col("scale") == "ipw").with_columns(pl.col("value").round_sig_figs(3))
-    #     print(yy)
-    #     print(res)
+    with pl.Config(tbl_rows=-1):
+        print(res)
 
 
 def bin_and_mean(x, y, n_bins, bin_type: str = "quantile"):
@@ -294,17 +310,32 @@ def bin_and_mean(x, y, n_bins, bin_type: str = "quantile"):
     return midpoints, y_means, n
 
 
-def main_plot():
-    key = jax.random.PRNGKey(321)
+@cli.command()
+@click.option("--model-file", default="shift.yaml", help="Name of the model file.")
+@click.option("--num-samples", default=2_000, help="Number of training observations.")
+@click.option("--seed", default=123, help="Random seed.")
+def plot(model_file, num_samples, seed: int):
+    experiment_name = model_file.removesuffix(".yaml")
+    experiment_name = f"{experiment_name}_{num_samples}"
+
+    key = jax.random.PRNGKey(seed)
     truth, preds = run_simulations(
-        MODEL_DIR / "shift.yaml",
+        MODEL_DIR / model_file,
         key,
-        num_samples=2_000,
+        num_samples=num_samples,
         num_simulations=1,
     )
 
+    # log some comparison stats
+    res = evaluate_mulitple_predictions(np.log(truth), preds)
+    msgs = [f"Evaluation statistics for: {experiment_name}"]
+    for name, val in res.items():
+        msgs.append(f"{name}: {val}")
+
+    logger.info("\n".join(msgs))
+
     n_bins = 15
-    bin_type = "linear_y"  # "quantile"
+    bin_type = "linear_y"
     bin_preds = {
         name: bin_and_mean(np.exp(pred), truth, n_bins, bin_type)
         for name, pred in preds.items()
@@ -359,15 +390,10 @@ def main_plot():
         .encode(x="midpoint:Q", y="midpoint:Q")
     )
 
-    save_path = RESULTS_DIR / "chart.html"
+    save_path = RESULTS_DIR / f"{experiment_name}.html"
     logger.info(f"Saving plot to {str(save_path.resolve())}")
     chart.save(save_path)
 
-    res = evaluate_mulitple_predictions(np.log(truth), preds)
-    for name, val in res.items():
-        print(f"{name}: {val}")
-
 
 if __name__ == "__main__":
-    # main()
-    main_plot()
+    cli()
