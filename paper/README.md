@@ -11,10 +11,10 @@ The directory is organized as:
 Simulations can be run via the command line as
 
 ```bash
-pixi run paper run --model-file shift.yaml
-pixi run paper run --model-file stabilized_weights_empirical.yaml
-pixi run paper run --model-file stabilized_weights_mc.yaml
-pixi run paper run --model-file stabilized_weights_quantile.yaml
+pixi run paper simulations --model-file shift.yaml
+pixi run paper simulations --model-file stabilized_weights_empirical.yaml
+pixi run paper simulations --model-file stabilized_weights_mc.yaml
+pixi run paper simulations --model-file stabilized_weights_quantile.yaml
 ```
 
 Additionally, example plots for a single run can be created using the command
@@ -23,4 +23,4 @@ Additionally, example plots for a single run can be created using the command
 pixi run paper plot --model-file shift.yaml --seed 12345
 ```
 
-To see more options for these commands run e.g. `pixi run paper run --help`.
+To see more options for these commands run e.g. `pixi run paper simulations --help`.
