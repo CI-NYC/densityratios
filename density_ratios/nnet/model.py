@@ -155,7 +155,7 @@ def train(
             if stop_yn:
                 if verbose:
                     logger.info(
-                        f"Stopping at Epoch {epoch + 1}, Validation Loss ({objective_name}): {loss_valid:.4f}"
+                        f"Stopping at Epoch {epoch}, Validation Loss ({objective_name}): {loss_valid:.4f}"
                     )
                 return nnet
 
