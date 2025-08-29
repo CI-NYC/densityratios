@@ -11,6 +11,7 @@ def fit_lsif_coefficients(
     x0,
     smoothing_parameter: float = 0.0,
     normalization_tolerance: float | None = None,
+    verbose: bool = False,
 ):
     """Fit the coefficients for the LSIF model.
 
@@ -44,7 +45,7 @@ def fit_lsif_coefficients(
     basis_dimension = len(model.coefficients)
     H = np.dot(H.T, H) / n0
 
-    solver_settings = {"verbose": False}
+    solver_settings = {"verbose": verbose}
     solver = osqp.OSQP()
     solver.setup(
         P=spa.csc_matrix(H),
@@ -64,6 +65,7 @@ def train_lsif(
     smoothing_parameters,
     bandwidths,
     basis_dimensions,
+    verbose: bool = False,
 ) -> GaussianKernelModel:
     # TODO: Cross validation of smoothing parameters?
     smoothing_parameter = smoothing_parameters[0]
@@ -71,5 +73,7 @@ def train_lsif(
     basis_dimension = basis_dimensions[0]
 
     model = GaussianKernelModel.init_from_data(key, x1, basis_dimension, bandwidth)
-    fitted_coefs = fit_lsif_coefficients(model, x1, x0, smoothing_parameter)
+    fitted_coefs = fit_lsif_coefficients(
+        model, x1, x0, smoothing_parameter, verbose=verbose
+    )
     return model.with_coefficients(fitted_coefs)

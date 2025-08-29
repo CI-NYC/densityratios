@@ -5,6 +5,7 @@ import torch
 import torch.nn as nn
 from torch import Tensor
 from torch.utils.data import DataLoader, TensorDataset
+from tqdm import tqdm
 
 from density_ratios.logging import get_logger
 from density_ratios.objectives import DensityRatioObjective
@@ -133,7 +134,8 @@ def train(
         weights_valid_tensor = torch.as_tensor(weights_valid)
 
     # Training loop
-    for epoch in range(num_iterations):
+    pbar = tqdm(range(1, num_iterations + 1), disable=not verbose, leave=False)
+    for epoch in pbar:
         for xb, yb, wb in loader:
             optimizer.zero_grad()
             preds = nnet(xb)
@@ -142,9 +144,7 @@ def train(
             optimizer.step()
 
         if verbose:
-            logger.info(
-                f"Epoch {epoch + 1}, Loss ({objective_name}): {loss.item():.4f}"
-            )
+            pbar.set_description(f"Loss ({objective_name}): {loss.item():.4f}")
 
         if early_stopping:
             preds_valid = nnet(x_valid_tensor)
@@ -153,9 +153,10 @@ def train(
             )
             stop_yn = stopper.update(loss_valid.item())
             if stop_yn:
-                logger.info(
-                    f"Stopping at Epoch {epoch + 1}, Validation Loss ({objective_name}): {loss_valid:.4f}"
-                )
+                if verbose:
+                    logger.info(
+                        f"Stopping at Epoch {epoch}, Validation Loss ({objective_name}): {loss_valid:.4f}"
+                    )
                 return nnet
 
     return nnet

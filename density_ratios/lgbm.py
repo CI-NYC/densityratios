@@ -1,5 +1,6 @@
 from typing import Any
 
+import jax
 import lightgbm as lgb
 import numpy as np
 from jax.typing import ArrayLike
@@ -13,18 +14,21 @@ lgb.register_logger(logger)
 
 def _grad_hess_lgb(dro: DensityRatioObjective):
     """Gradient and Hessian function for LightGBM."""
+    grad_hess_fn = jax.jit(dro.grad_hess)
 
     def fn(y: ArrayLike, data: lgb.Dataset):
-        return dro.grad_hess(y, delta=data.get_label(), weight=data.get_weight())
+        grad, hess = grad_hess_fn(y, delta=data.get_label(), weight=data.get_weight())
+        return np.asarray(grad), np.asarray(hess)
 
     return fn
 
 
 def _loss_lgb(dro: DensityRatioObjective):
     """Loss Evaluation function for LightGBM."""
+    loss_fn = jax.jit(dro.loss)
 
     def fn(y: ArrayLike, data: lgb.Dataset):
-        loss = dro.loss(y, delta=data.get_label(), weight=data.get_weight())
+        loss = loss_fn(y, delta=data.get_label(), weight=data.get_weight())
         return dro.__class__.__name__, loss.item(), False
 
     return fn

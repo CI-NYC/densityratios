@@ -15,6 +15,7 @@ def fit_kliep_coefficients(
     learning_rate: float = 1e-4,
     num_iterations: int = 5000,
     tolerance: float = 1e-6,
+    verbose: bool = False,
 ) -> jax.Array:
     """Fit the coefficients for the KLIEP model.
 
@@ -70,7 +71,13 @@ def fit_kliep_coefficients(
         converged = jnp.all(jnp.abs(coefs - old_coefs) < tolerance)
         return coefs, converged, i + 1
 
-    fitted_coefs, *_ = jax.lax.while_loop(stopping_condition, update, (coefs, False, 0))
+    fitted_coefs, converged, iteration = jax.lax.while_loop(
+        stopping_condition, update, (coefs, False, 0)
+    )
+    if verbose:
+        logger.info(
+            f"KLIEP coefficient estimation: converged={converged.item()}\titeration={iteration.item()}"
+        )
     return fitted_coefs
 
 
@@ -83,10 +90,11 @@ def _train_single_kliep(
     learning_rate,
     num_iterations,
     tolerance,
+    verbose,
 ) -> KernelModel:
     model = GaussianKernelModel.init_from_data(key, x1, basis_dimension, bandwidth)
     fitted_coefs = fit_kliep_coefficients(
-        model, x1, x0, learning_rate, num_iterations, tolerance
+        model, x1, x0, learning_rate, num_iterations, tolerance, verbose
     )
     return model.with_coefficients(fitted_coefs)
 
@@ -115,6 +123,7 @@ def train_kliep(
             learning_rate,
             num_iterations,
             tolerance,
+            verbose,
         )
 
     # LCV loop
@@ -142,6 +151,7 @@ def train_kliep(
                 learning_rate,
                 num_iterations,
                 tolerance,
+                verbose,
             )
             preds = model_i.predict_basis(x1_fold)
 
@@ -175,4 +185,5 @@ def train_kliep(
         learning_rate,
         num_iterations,
         tolerance,
+        verbose,
     )

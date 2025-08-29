@@ -5,7 +5,7 @@ import pytest
 
 from density_ratios.augmentation import (
     augment_shift_intervention,
-    augment_stabalized_weights,
+    augment_stabilized_weights,
 )
 from density_ratios.kernel.kde import train_kde
 from density_ratios.kernel.train import train as train_kernel
@@ -53,16 +53,16 @@ def test_data():
 @pytest.fixture()
 def augmented_data(train_data):
     a, x = train_data
-    return augment_stabalized_weights(
+    return augment_stabilized_weights(
         x, a, method="monte_carlo", multipler_monte_carlo=2.0
     )
 
 
 @pytest.mark.parametrize("method", ["monte_carlo", "quantile", "split_sample"])
-def test_augment_stabalized_weights(train_data, method):
+def test_augment_stabilized_weights(train_data, method):
     """Test that the package can be imported."""
     a, x = train_data
-    delta, x_augmented, w_augmented = augment_stabalized_weights(
+    delta, x_augmented, w_augmented = augment_stabilized_weights(
         x, a, method=method, multipler_monte_carlo=2.0
     )
     num_out = len(delta)
@@ -131,14 +131,14 @@ def test_kernel_training(augmented_data, test_data, method):
     assert preds.shape == (len(a),)
 
 
-@pytest.mark.parametrize("stabalized_weight", [True, False])
-def test_kde_training(augmented_data, test_data, stabalized_weight):
+@pytest.mark.parametrize("stabilized_weight", [True, False])
+def test_kde_training(augmented_data, test_data, stabilized_weight):
     delta, x_augmented, w_augmented = augmented_data
     model = train_kde(
         y=delta,
         x=x_augmented,
         weights=w_augmented,
-        params={"stabalized_weight": stabalized_weight},
+        params={"stabilized_weight": stabilized_weight},
     )
     a, x = test_data
     preds = model.predict(np.column_stack([a, x]))
@@ -149,15 +149,35 @@ def test_kde_training(augmented_data, test_data, stabalized_weight):
     "objective", [BinaryCrossEntropy, KullbackLeibler, LeastSquares]
 )
 def test_torch_jax_losses(objective):
+    # test Jax implementation and pytorch implementations agree
     key = jax.random.PRNGKey(112358)
     key1, key2, key3 = jax.random.split(key, 3)
     n = 100
-    a = jax.random.gamma(key1, 1.0, shape=n)
+    y = jax.random.gamma(key1, 1.0, shape=n)
     d = jax.random.bernoulli(key2, p=0.5, shape=n)
     w = jax.random.gamma(key3, 1.0, shape=n)
 
     obj = objective()
-    loss_jax = obj.loss(a, d, w).item()
-    loss_torch = obj.loss_torch(a, d, w).item()
+    loss_jax = obj.loss(y, d, w).item()
+    loss_torch = obj.loss_torch(y, d, w).item()
 
     assert jnp.abs(loss_jax - loss_torch) <= 1.0e-6
+
+
+@pytest.mark.parametrize(
+    "objective", [BinaryCrossEntropy, KullbackLeibler, LeastSquares]
+)
+def test_losses_grad(objective):
+    # test derivative code agrees with auto diff
+    key = jax.random.PRNGKey(112358)
+    key1, key2, key3 = jax.random.split(key, 3)
+    n = 100
+    y = jax.random.gamma(key1, 1.0, shape=n)
+    d = jax.random.bernoulli(key2, p=0.5, shape=n)
+    w = jax.random.gamma(key3, 1.0, shape=n)
+
+    obj = objective()
+    auto_grads = jax.grad(obj.loss)(y, d, w)
+    manual_grads, _ = obj.grad_hess(y, d, w)
+
+    assert jnp.abs(auto_grads - manual_grads).max() <= 1.0e-6

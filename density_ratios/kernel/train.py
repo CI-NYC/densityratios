@@ -38,7 +38,7 @@ def train(
 
     elif method == "LSIF":
         model = train_lsif(
-            key, x1, x0, smoothing_parameters, bandwidths, basis_dimensions
+            key, x1, x0, smoothing_parameters, bandwidths, basis_dimensions, verbose
         )
 
     elif method == "KLIEP":
