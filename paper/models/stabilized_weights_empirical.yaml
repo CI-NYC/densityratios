@@ -1,3 +1,5 @@
+data_generating_process: dgp1_stabilized_weight
+
 augmentation_params:
   function: augment_stabilized_weights
   kwargs:
@@ -8,19 +10,19 @@ kde:
   model: kde
   stabilized_weight: True
 
-kliep:
-  model: kernel
-  method: KLIEP
-  basis_dimensions: [100, 200, 500]
-  bandwidths: [1.0, 2.0, 5.0, 10.0]
-  num_iterations: 5000
+# kliep:
+#   model: kernel
+#   method: KLIEP
+#   basis_dimensions: [100, 200, 500]
+#   bandwidths: [1.0, 2.0, 5.0, 10.0]
+#   num_iterations: 5000
 
-ulsif:
-  model: kernel
-  method: uLSIF
-  basis_dimensions: [100, 200, 500]
-  bandwidths: [1.0, 2.0, 5.0, 10.0]
-  smoothing_parameters: [0.0, 0.1, 0.5, 1.0]
+# ulsif:
+#   model: kernel
+#   method: uLSIF
+#   basis_dimensions: [100, 200, 500]
+#   bandwidths: [1.0, 2.0, 5.0, 10.0]
+#   smoothing_parameters: [0.0, 0.1, 0.5, 1.0]
 
 lsif:
   model: kernel

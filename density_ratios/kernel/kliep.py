@@ -92,7 +92,7 @@ def _train_single_kliep(
     tolerance,
     verbose,
 ) -> KernelModel:
-    model = GaussianKernelModel.init_from_data(key, x1, basis_dimension, bandwidth)
+    model = GaussianKernelModel.init_from_data(key, x0, basis_dimension, bandwidth)
     fitted_coefs = fit_kliep_coefficients(
         model, x1, x0, learning_rate, num_iterations, tolerance, verbose
     )

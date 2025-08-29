@@ -1,8 +1,10 @@
+import timeit
 from pathlib import Path
 
 import altair as alt
 import click
 import jax
+import jax.numpy as jnp
 import numpy as np
 import polars as pl
 import yaml
@@ -23,15 +25,15 @@ RESULTS_DIR = Path("results")
 
 def dgp1(key, num_samples, num_features=20):
     x = jax.random.normal(key, shape=(num_samples, num_features))
-    mu = x[..., 0]  # + np.maximum(x[..., 1], 0)
+    mu = x[..., 0] + np.maximum(x[..., 1], 0)
     a = jax.random.normal(key, shape=(num_samples,)) + mu
     return a.reshape((-1, 1)), x
 
 
-def dgp1_true_ratio(a, x, shift_size: float = 0.1):
-    """True ratio function."""
+def dgp1_true_ratio_shift(a, x, shift_size: float = 0.1):
+    """True ratio function for shift intervention."""
     # p(a - shift | x) / p(a | x)
-    a_residual = a.squeeze() - x[..., 0]  # - np.maximum(x[..., 1], 0)  # a - E[A|X]
+    a_residual = a.squeeze() - x[..., 0] - np.maximum(x[..., 1], 0)  # a - E[A|X]
     a_cond = jax.scipy.stats.norm.pdf(a_residual, scale=1)
     a_cond_shifted = jax.scipy.stats.norm.pdf(a_residual - shift_size, scale=1)
     return a_cond_shifted / a_cond
@@ -43,10 +45,38 @@ def dgp1_true_outcome(a, x, key):
     return jax.random.normal(key, shape=(num_samples,)) + mu
 
 
+def dgp2(key, num_samples, num_features=20):
+    x = jax.random.normal(key, shape=(num_samples, num_features))
+    a = jax.random.normal(key, shape=(num_samples,)) + x[..., 0]
+    return a.reshape((-1, 1)), x
+
+
+def dgp2_true_ratio_stabilized_weight(a, x, shape0=8.0, shape1=7.0):
+    """True ratio function."""
+    # p(a) / p(a | x)
+    a_residual = a.squeeze() - x[..., 0]
+    a_cond = jax.scipy.stats.norm.pdf(a_residual, scale=1)
+    a_marginal = jax.scipy.stats.norm.pdf(a.squeeze(), scale=jnp.sqrt(2))
+    return a_marginal / a_cond
+
+
 # Function look up dict
 _augmentation_funcs = {
     "augment_shift_intervention": augment_shift_intervention,
     "augment_stabilized_weights": augment_stabilized_weights,
+}
+
+_dgp_lookup = {
+    "dgp1_shift": {
+        "dgp": dgp1,
+        "true_ratio": dgp1_true_ratio_shift,
+        "true_outcome": dgp1_true_outcome,
+    },
+    "dgp1_stabilized_weight": {
+        "dgp": dgp2,
+        "true_ratio": dgp2_true_ratio_stabilized_weight,
+        "true_outcome": dgp1_true_outcome,
+    },
 }
 
 
@@ -90,7 +120,7 @@ def augment_and_fit(
 
     test_data = np.column_stack([a_test, x_test])
 
-    out = {"ones": np.zeros(len(test_data))}  # log(1) = 0 as baseline
+    out = {"ones": (np.zeros(len(test_data)), 0.0)}  # log(1) = 0 as baseline
     objectives = {
         "least_squares": LeastSquares(),
         "kullback_leibler": KullbackLeibler(),
@@ -112,6 +142,7 @@ def augment_and_fit(
 
                 # These ones use train and validation
                 # TODO make this more robust
+                t0 = timeit.default_timer()
                 model = train(
                     y=delta_train,
                     x=x_augmented_train,
@@ -124,9 +155,11 @@ def augment_and_fit(
                     weights_valid=w_augmented_valid,
                     verbose=verbose,
                 )
-                out[f"{name}_{obj_name}"] = model.predict(test_data)
+                duration = timeit.default_timer() - t0
+                out[f"{name}_{obj_name}"] = model.predict(test_data), duration
 
         else:
+            t0 = timeit.default_timer()
             model = train(
                 y=delta,
                 x=x_augmented,
@@ -135,7 +168,8 @@ def augment_and_fit(
                 model=model_name,
                 verbose=verbose,
             )
-            out[f"{name}"] = model.predict(test_data)
+            duration = timeit.default_timer() - t0
+            out[f"{name}"] = model.predict(test_data), duration
 
     return out
 
@@ -157,12 +191,19 @@ def evaluations(true_logits, pred_logits, true_y=None) -> dict:
     return out
 
 
-def evaluate_mulitple_predictions(true_logits, pred_dict: dict, true_y=None) -> dict:
-    return {
+def evaluate_mulitple_predictions(
+    true_logits, pred_dict: dict[str, tuple], true_y=None
+) -> dict:
+    stats = {
         f"{name}_{stat_name}": stat
-        for name, pred in pred_dict.items()
+        for name, (pred, duration) in pred_dict.items()
         for stat_name, stat in evaluations(true_logits, pred, true_y).items()
     }
+    durations = {
+        f"{name}_duration_seconds": duration
+        for name, (pred, duration) in pred_dict.items()
+    }
+    return stats | durations
 
 
 def run_simulations(
@@ -171,9 +212,6 @@ def run_simulations(
     num_simulations: int,
     num_samples: int,
     num_test_samples: int = 10_000,
-    dgp=dgp1,
-    dgp_true_ratio=dgp1_true_ratio,
-    dgp_outcome=dgp1_true_outcome,
 ) -> pl.DataFrame:
     verbose = num_simulations == 1
     logger.info(
@@ -183,6 +221,17 @@ def run_simulations(
         models_dict = yaml.safe_load(f)
 
     augmentation_params = models_dict.pop("augmentation_params", {})
+
+    dgp_name = models_dict.pop("data_generating_process", "")
+    _dgp = _dgp_lookup.get(dgp_name, None)
+
+    if _dgp is None:
+        raise KeyError(f"Data generating process: '{dgp_name}' not found.")
+
+    dgp = _dgp.get("dgp")
+    true_ratio = _dgp.get("true_ratio")
+    true_outcome = _dgp.get("true_outcome")
+
     param_set = models_dict
     outputs = []
 
@@ -196,8 +245,8 @@ def run_simulations(
         a_valid, x_valid = dgp(k_valid, num_samples=num_samples - num_train)
         a_test, x_test = dgp(k_test, num_samples=num_test_samples)
 
-        true_ratios = dgp_true_ratio(a_test, x_test)
-        true_y = dgp_outcome(a_test, x_test, k_outcome)
+        true_ratios = true_ratio(a_test, x_test)
+        true_y = true_outcome(a_test, x_test, k_outcome)
         pred_ratios_logit = augment_and_fit(
             a_train,
             x_train,
@@ -217,7 +266,7 @@ def run_simulations(
         # little hack for test plotting
         # todo: remove?
         if num_simulations == 1:
-            return true_ratios, pred_ratios_logit
+            return true_ratios, pred_ratios_logit, stats
 
     return pl.from_records(outputs)
 
@@ -255,7 +304,7 @@ def simulations(model_file, num_simulations, num_samples, num_test_samples, seed
         .unpivot()
         .select(
             name=pl.col("variable").str.extract(
-                r"^(\w+)_(mse|rmse|mae|bias)_(logit|ratio|ipw)$"
+                r"^(\w+)_(mse|rmse|mae|bias|duration)_(logit|ratio|ipw|seconds)$"
             ),
             scale=name_as_list.list.get(-1),
             stat=name_as_list.list.get(-2),
@@ -319,7 +368,7 @@ def plot(model_file, num_samples, seed: int):
     experiment_name = f"{experiment_name}_{num_samples}"
 
     key = jax.random.PRNGKey(seed)
-    truth, preds = run_simulations(
+    truth, preds, stats = run_simulations(
         MODEL_DIR / model_file,
         key,
         num_samples=num_samples,
@@ -327,11 +376,8 @@ def plot(model_file, num_samples, seed: int):
     )
 
     # log some comparison stats
-    res = evaluate_mulitple_predictions(np.log(truth), preds)
     msgs = [f"Evaluation statistics for: {experiment_name}"]
-    for name, val in res.items():
-        msgs.append(f"{name}: {val}")
-
+    msgs += [f"{name}: {val}" for name, val in stats.items()]
     logger.info("\n".join(msgs))
 
     n_bins = 15

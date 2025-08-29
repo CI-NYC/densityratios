@@ -1,3 +1,5 @@
+data_generating_process: dgp1_shift
+
 augmentation_params:
   function: augment_shift_intervention
   kwargs:

@@ -1,36 +1,38 @@
+data_generating_process: dgp1_stabilized_weight
+
 augmentation_params:
   function: augment_stabilized_weights
   kwargs:
     method: monte_carlo
     # Number of monte carlo draws is: n * multipler_monte_carlo
-    multipler_monte_carlo: 100
+    multipler_monte_carlo: 50
 
 # Model parameters
 kde:
   model: kde
   stabilized_weight: True
 
-kliep:
-  model: kernel
-  method: KLIEP
-  basis_dimensions: [100, 200, 500]
-  bandwidths: [1.0, 2.0, 5.0, 10.0]
-  num_iterations: 5000
+# kliep:
+#   model: kernel
+#   method: KLIEP
+#   basis_dimensions: [100, 200, 500]
+#   bandwidths: [1.0, 2.0, 5.0, 10.0]
+#   num_iterations: 5000
 
-ulsif:
-  model: kernel
-  method: uLSIF
-  basis_dimensions: [100, 200, 500]
-  bandwidths: [1.0, 2.0, 5.0, 10.0]
-  smoothing_parameters: [0.0, 0.1, 0.5, 1.0]
+# ulsif:
+#   model: kernel
+#   method: uLSIF
+#   basis_dimensions: [100, 200, 500]
+#   bandwidths: [1.0, 2.0, 5.0, 10.0]
+#   smoothing_parameters: [0.0, 0.1, 0.5, 1.0]
 
-lsif:
-  model: kernel
-  method: LSIF
-  # current implementation does not support cross validation
-  basis_dimensions: [500]
-  bandwidths: [10.0]
-  smoothing_parameters: [0.0]
+# lsif:
+#   model: kernel
+#   method: LSIF
+#   # current implementation does not support cross validation
+#   basis_dimensions: [500]
+#   bandwidths: [10.0]
+#   smoothing_parameters: [0.0]
 
 nnet:
   model: nnet

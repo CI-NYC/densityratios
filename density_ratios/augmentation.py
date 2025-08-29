@@ -72,7 +72,7 @@ def augment_stabilized_weights(
     if method == "quantile":
         half_width = 1 / n_quantiles / 2
         quantiles = np.linspace(half_width, 1 - half_width, n_quantiles)
-        a_quantiles = np.quantile(a, quantiles)
+        a_quantiles = np.quantile(a, quantiles).astype(a.dtype)
         arrs_augmented.append([np.zeros_like(a, dtype=np.bool), a, x])
 
         for q in a_quantiles:
