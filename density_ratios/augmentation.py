@@ -16,11 +16,12 @@ def _postprocess_augmented_data(
     a = np.concatenate([arr[1].squeeze() for arr in arrs_augmented], axis=0)
     x = np.concatenate([arr[2] for arr in arrs_augmented], axis=0)
 
-    n1 = np.sum(delta)
+    n1 = np.sum(delta, dtype=np.float32)
     n0 = len(delta) - n1
 
     # TODO: allow weights to be passed in
     w = np.where(delta, n0, n1)
+    w /= np.sum(w)
 
     return delta, np.column_stack([a, x]), w
 
@@ -144,6 +145,7 @@ def augment_stabilized_weights(
                 x,  # X
             ]
         )
+
     return _postprocess_augmented_data(arrs_augmented)
 
 
