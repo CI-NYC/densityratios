@@ -24,40 +24,38 @@ RESULTS_DIR = Path("results")
 
 
 def dgp1(key, num_samples, num_features=20):
+    c = 0.5
     x = jax.random.normal(key, shape=(num_samples, num_features))
-    mu = x[..., 0] + np.maximum(x[..., 1], 0)
-    a = jax.random.normal(key, shape=(num_samples,)) + mu
+    a = jax.random.normal(key, shape=(num_samples,)) + c * x[..., 0]
     return a.reshape((-1, 1)), x
 
 
 def dgp1_true_ratio_shift(a, x, shift_size: float = 0.1):
     """True ratio function for shift intervention."""
     # p(a - shift | x) / p(a | x)
-    a_residual = a.squeeze() - x[..., 0] - np.maximum(x[..., 1], 0)  # a - E[A|X]
-    a_cond = jax.scipy.stats.norm.pdf(a_residual, scale=1)
-    a_cond_shifted = jax.scipy.stats.norm.pdf(a_residual - shift_size, scale=1)
-    return a_cond_shifted / a_cond
+    a_residual = a.squeeze() - x[..., 0]  # - np.maximum(x[..., 1], 0)  # a - E[A|X]
+    log_a_cond = jax.scipy.stats.norm.logpdf(a_residual)
+    log_a_cond_shifted = jax.scipy.stats.norm.logpdf(a_residual - shift_size)
+    return jnp.exp(log_a_cond_shifted - log_a_cond)
+
+
+def dgp1_true_ratio_stabilized_weight(a, x):
+    """True ratio function."""
+    # p(a) / p(a | x)
+    c = 0.5
+    a_residual = a.squeeze() - c * x[..., 0]
+    log_a_cond = jax.scipy.stats.norm.logpdf(a_residual)
+    marginal_var = 1 + jnp.square(c)
+    log_a_marginal = jax.scipy.stats.norm.logpdf(
+        a.squeeze() / jnp.sqrt(marginal_var)
+    ) - (jnp.log(marginal_var) / 2)
+    return jnp.exp(log_a_marginal - log_a_cond)
 
 
 def dgp1_true_outcome(a, x, key):
     mu = a.squeeze() + x[..., 0] * x[..., 1] + x[..., 2]
     num_samples = len(mu)
     return jax.random.normal(key, shape=(num_samples,)) + mu
-
-
-def dgp2(key, num_samples, num_features=20):
-    x = jax.random.normal(key, shape=(num_samples, num_features))
-    a = jax.random.normal(key, shape=(num_samples,)) + x[..., 0]
-    return a.reshape((-1, 1)), x
-
-
-def dgp2_true_ratio_stabilized_weight(a, x, shape0=8.0, shape1=7.0):
-    """True ratio function."""
-    # p(a) / p(a | x)
-    a_residual = a.squeeze() - x[..., 0]
-    a_cond = jax.scipy.stats.norm.pdf(a_residual, scale=1)
-    a_marginal = jax.scipy.stats.norm.pdf(a.squeeze(), scale=jnp.sqrt(2))
-    return a_marginal / a_cond
 
 
 # Function look up dict
@@ -73,8 +71,8 @@ _dgp_lookup = {
         "true_outcome": dgp1_true_outcome,
     },
     "dgp1_stabilized_weight": {
-        "dgp": dgp2,
-        "true_ratio": dgp2_true_ratio_stabilized_weight,
+        "dgp": dgp1,
+        "true_ratio": dgp1_true_ratio_stabilized_weight,
         "true_outcome": dgp1_true_outcome,
     },
 }
@@ -203,7 +201,8 @@ def evaluate_mulitple_predictions(
         f"{name}_duration_seconds": duration
         for name, (pred, duration) in pred_dict.items()
     }
-    return stats | durations
+    stats.update(durations)
+    return stats
 
 
 def run_simulations(
@@ -374,7 +373,6 @@ def plot(model_file, num_samples, seed: int):
         num_samples=num_samples,
         num_simulations=1,
     )
-
     # log some comparison stats
     msgs = [f"Evaluation statistics for: {experiment_name}"]
     msgs += [f"{name}: {val}" for name, val in stats.items()]
@@ -384,7 +382,7 @@ def plot(model_file, num_samples, seed: int):
     bin_type = "linear_y"
     bin_preds = {
         name: bin_and_mean(np.exp(pred), truth, n_bins, bin_type)
-        for name, pred in preds.items()
+        for name, (pred, _) in preds.items()
     }
 
     df = (
