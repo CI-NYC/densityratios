@@ -72,7 +72,7 @@ def train_lsif(
     bandwidth = bandwidths[0]
     basis_dimension = basis_dimensions[0]
 
-    model = GaussianKernelModel.init_from_data(key, x0, basis_dimension, bandwidth)
+    model = GaussianKernelModel.init_from_data(key, x1, basis_dimension, bandwidth)
     fitted_coefs = fit_lsif_coefficients(
         model, x1, x0, smoothing_parameter, verbose=verbose
     )

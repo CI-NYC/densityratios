@@ -119,7 +119,7 @@ def _train_single_ulsif(
     bandwidth,
     basis_dimension,
 ) -> GaussianKernelModel:
-    model = GaussianKernelModel.init_from_data(key, x0, basis_dimension, bandwidth)
+    model = GaussianKernelModel.init_from_data(key, x1, basis_dimension, bandwidth)
     fitted_coefs = fit_ulsif_coefficients(model, x1, x0, smoothing_parameter)
     return model.with_coefficients(fitted_coefs)
 
@@ -154,7 +154,7 @@ def train_ulsif(
     cv_scores = []
     for input in cv_inputs:
         bandwidth_j, dimension_j = input
-        model = GaussianKernelModel.init_from_data(key, x0, dimension_j, bandwidth_j)
+        model = GaussianKernelModel.init_from_data(key, x1, dimension_j, bandwidth_j)
         scores = ulsif_loocv_scores(model, x1, x0, smoothing_parameters)
 
         for score, smoothing_parameter in zip(scores, smoothing_parameters):
