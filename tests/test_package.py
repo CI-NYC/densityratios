@@ -63,12 +63,21 @@ def augmented_data(train_data):
     )
 
 
-@pytest.mark.parametrize("method", ["monte_carlo", "quantile", "split_sample"])
+@pytest.mark.parametrize(
+    "method",
+    [
+        "quantile",
+        "monte_carlo",
+        "monte_carlo_shuffle",
+        "monte_carlo_derangment",
+        "split_sample",
+    ],
+)
 def test_augment_stabilized_weights(train_data, method):
     """Test that the package can be imported."""
     a, x = train_data
     delta, x_augmented, w_augmented = augment_stabilized_weights(
-        x, a, method=method, multipler_monte_carlo=2.0
+        x, a, method=method, multipler_monte_carlo=2
     )
     num_out = len(delta)
     num_features = x.shape[1]
