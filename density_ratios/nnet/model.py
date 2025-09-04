@@ -6,10 +6,14 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch import Tensor
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, RandomSampler, TensorDataset
 from tqdm import tqdm
 
 from density_ratios.logging import get_logger
+from density_ratios.nnet.samplers import (
+    StablilizedWeightDataset,
+    StablilizedWeightSampler,
+)
 from density_ratios.objectives import DensityRatioObjective
 
 logger = get_logger(__name__)
@@ -53,13 +57,14 @@ class MLP(nn.Module):
 
 
 class EarlyStopper:
-    def __init__(self, patience: int, min_delta: float):
+    def __init__(self, patience: int, min_delta: float, save_net: bool = False):
         self.patience = patience
         self.min_delta = min_delta
         self.counter = 0
         self.best_loss = float("inf")
         self.losses: list[float] = []
         self.best_nnet = None
+        self.save_net = save_net
 
     def update(self, validation_loss: float, nnet: MLP | None = None) -> bool:
         self.losses.append(validation_loss)
@@ -67,7 +72,9 @@ class EarlyStopper:
         if validation_loss < self.best_loss - self.min_delta:
             self.best_loss = validation_loss
             self.counter = 0
-            if nnet is not None:
+            if nnet is not None and self.save_net:
+                # This operation is quite slow and memory intensive
+                # but it enables us to backtrack to the best nnet
                 self.best_nnet = deepcopy(nnet)
             return False
 
@@ -85,6 +92,7 @@ def train_single_mlp(
     x_valid=None,
     weights_valid=None,
     verbose: bool = False,
+    seed: int | None = None,
 ) -> MLP:
     """Perform the training with given parameters.
 
@@ -114,20 +122,39 @@ def train_single_mlp(
     batch_size = params.get("batch_size") or 32
     learning_rate = params.get("learning_rate") or 1e-3
     num_iterations = params.get("num_iterations") or 1000
+    stabilized_weights = params.get("stabilized_weights") or False
 
-    nnet = MLP(depth=depth, input_dim=n_features, hidden_dim=width, output_dim=1)
-    train_set = TensorDataset(
-        torch.as_tensor(x), torch.as_tensor(y), torch.as_tensor(weights)
-    )
-
-    loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
-    optimizer = torch.optim.Adam(nnet.parameters(), lr=learning_rate)
-
-    # Early stopping setup
     has_validation = (
         (y_valid is not None) and (x_valid is not None) and (weights_valid is not None)
     )
     early_stopping = has_validation & params.get("early_stopping", True)
+
+    # Use random seed if None provided.
+    seed = seed or int(torch.empty((), dtype=torch.int64).random_().item())
+    generator = torch.Generator()
+    generator.manual_seed(seed)
+
+    if stabilized_weights:
+        if verbose:
+            logger.info("Using stabilized weight based sampling")
+        train_set = StablilizedWeightDataset(
+            torch.as_tensor(x[y == 0, [0]]), torch.as_tensor(x[y == 0, 1:])
+        )
+        sampler = StablilizedWeightSampler(
+            train_set,
+            False,
+            derangement=params.get("stabilized_weights_derangement", False),
+            generator=generator,
+        )
+    else:
+        train_set = TensorDataset(
+            torch.as_tensor(x), torch.as_tensor(y), torch.as_tensor(weights)
+        )
+        sampler = RandomSampler(train_set, False, generator=generator)
+
+    loader = DataLoader(train_set, batch_size=batch_size, sampler=sampler)
+    nnet = MLP(depth=depth, input_dim=n_features, hidden_dim=width, output_dim=1)
+    optimizer = torch.optim.Adam(nnet.parameters(), lr=learning_rate)
 
     if has_validation:
         x_valid_tensor = torch.as_tensor(x_valid)
@@ -143,6 +170,7 @@ def train_single_mlp(
         stopper = EarlyStopper(
             patience=params.get("early_stopping_round", 0),
             min_delta=params.get("early_stopping_min_delta", 0.0),
+            save_net=params.get("early_stop_save_nnet", True),
         )
 
     # Training loop
@@ -168,7 +196,7 @@ def train_single_mlp(
                     logger.info(
                         f"Stopping at Epoch {epoch}, Best Validation Loss ({objective_name}): {stopper.best_loss:.4f}"
                     )
-                return stopper.best_nnet
+                return stopper.best_nnet or nnet
 
     if has_validation and not early_stopping:
         loss_valid = loss_valid_fn(nnet(x_valid_tensor))

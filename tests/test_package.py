@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pytest
+import torch
 
 from density_ratios.augmentation import (
     augment_shift_intervention,
@@ -11,6 +12,10 @@ from density_ratios.kernel.kde import train_kde
 from density_ratios.kernel.train import train as train_kernel
 from density_ratios.lgbm import train as train_lgb
 from density_ratios.nnet import train as train_nnet
+from density_ratios.nnet.samplers import (
+    StablilizedWeightDataset,
+    StablilizedWeightSampler,
+)
 from density_ratios.objectives import BinaryCrossEntropy, KullbackLeibler, LeastSquares
 
 BOOSTER_PARAMS = {}
@@ -181,3 +186,34 @@ def test_losses_grad(objective):
     manual_grads, _ = obj.grad_hess(y, d, w)
 
     assert jnp.abs(auto_grads - manual_grads).max() <= 1.0e-6
+
+
+@pytest.mark.parametrize(
+    "item, expected",
+    [
+        (0, (torch.tensor([1, 10]), torch.tensor(0.0), torch.tensor(1 / 2))),
+        (2, (torch.tensor([3, 30]), torch.tensor(0.0), torch.tensor(1 / 2))),
+        (3, (torch.tensor([1, 10]), torch.tensor(1.0), torch.tensor(1 / 2))),
+        (4, (torch.tensor([1, 20]), torch.tensor(1.0), torch.tensor(1 / 2))),
+    ],
+)
+def test_stabilized_weight_dataset(item, expected):
+    data = StablilizedWeightDataset(torch.tensor([1, 2, 3]), torch.tensor([10, 20, 30]))
+    x_actual, y_actual, w_actual = data[item]
+    x_expected, y_expected, w_expected = expected
+    assert torch.all(x_actual == x_expected)
+    assert y_actual == y_expected
+    assert w_actual == w_expected
+
+
+def test_stabilized_weight_sampler():
+    data = StablilizedWeightDataset(torch.tensor([1, 2, 3]), torch.tensor([10, 20, 30]))
+    sampler = StablilizedWeightSampler(data, replacement=False)
+    sample_indexes = list(iter(sampler))
+
+    assert len(sample_indexes) == (2 * len(data))
+
+    samples = [data[index] for index in sample_indexes]
+    n1 = sum([1 for sample in samples if sample[1]])
+    n0 = sum([1 for sample in samples if not sample[1]])
+    assert n0 == n1

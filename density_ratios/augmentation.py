@@ -32,7 +32,7 @@ def augment_stabilized_weights(
     weight: ArrayLike | None = None,
     method: str = "empirical",
     n_quantiles: int = 500,
-    multipler_monte_carlo: float = 1.0,
+    multipler_monte_carlo: int = 1,
     key: jax.random.PRNGKey = jax.random.PRNGKey(123),
 ) -> tuple[Array, Array, Array]:
     """Augmented dataset for stabilized weights estimation.
