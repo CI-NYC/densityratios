@@ -311,11 +311,13 @@ def simulations(model_file, num_simulations, num_samples, num_test_samples, seed
                 for m in multipliers
             }
 
-    for exp_name, md in models_dicts.items():
+    keys = jax.random.split(key, len(models_dicts))
+
+    for i, (exp_name, md) in enumerate(models_dicts.items()):
         logger.info(f"Running experiment: {exp_name}")
         results = run_simulations(
             md,
-            key,
+            key=keys[i],
             num_simulations=num_simulations,
             num_samples=num_samples,
             num_test_samples=num_test_samples,
