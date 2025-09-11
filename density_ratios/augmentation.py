@@ -31,7 +31,6 @@ def augment_stabilized_weights(
     a: ArrayLike,
     weight: ArrayLike | None = None,
     method: str = "empirical",
-    n_quantiles: int = 500,
     multipler_monte_carlo: int = 1,
     key: jax.random.PRNGKey = jax.random.PRNGKey(123),
 ) -> tuple[Array, Array, Array]:
@@ -43,7 +42,6 @@ def augment_stabilized_weights(
     a: treatment vector.
     weight: optional observation weight vector.
     method: which method to use.
-    n_quantiles: used only when method is 'quantile'
     multipler_monte_carlo: how big the monte-carlo sample should be,
         Used only when method is 'monte_carlo'.
         Number of mc replicates is ceil(num_samples * multipler_monte_carlo)
@@ -73,6 +71,7 @@ def augment_stabilized_weights(
     num_samples = x.shape[0]
 
     if method == "quantile":
+        n_quantiles = int(multipler_monte_carlo)
         half_width = 1 / n_quantiles / 2
         quantiles = np.linspace(half_width, 1 - half_width, n_quantiles)
         a_quantiles = np.quantile(a, quantiles).astype(a.dtype)

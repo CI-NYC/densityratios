@@ -1,4 +1,5 @@
 import timeit
+from copy import deepcopy
 from pathlib import Path
 
 import altair as alt
@@ -206,7 +207,7 @@ def evaluate_mulitple_predictions(
 
 
 def run_simulations(
-    model_file: Path,
+    models_dict: dict,
     key,
     num_simulations: int,
     num_samples: int,
@@ -214,10 +215,8 @@ def run_simulations(
 ) -> pl.DataFrame:
     verbose = num_simulations == 1
     logger.info(
-        f"Running simulations with:\nmodel_file='{str(model_file)}'\n{num_simulations=}\n{num_samples=}\n{num_test_samples=}\n{verbose=}"
+        f"Running simulations with:\n{num_simulations=}\n{num_samples=}\n{num_test_samples=}\n{verbose=}"
     )
-    with open(model_file) as f:
-        models_dict = yaml.safe_load(f)
 
     augmentation_params = models_dict.pop("augmentation_params", {})
 
@@ -278,7 +277,7 @@ def cli():
 
 @cli.command()
 @click.option("--model-file", default="shift.yaml", help="Name of the model file.")
-@click.option("--num-simulations", default=200, help="Number of dataset replicates.")
+@click.option("--num-simulations", default=100, help="Number of dataset replicates.")
 @click.option("--num-samples", default=2_000, help="Number of training observations.")
 @click.option("--num-test-samples", default=10_000, help="Number of test observations.")
 @click.option("--seed", default=123, help="Random seed.")
@@ -286,38 +285,66 @@ def simulations(model_file, num_simulations, num_samples, num_test_samples, seed
     experiment_name = model_file.removesuffix(".yaml")
     experiment_name = f"{experiment_name}_{num_samples}"
     key = jax.random.PRNGKey(seed)
-    results = run_simulations(
-        MODEL_DIR / model_file,
-        key,
-        num_simulations=num_simulations,
-        num_samples=num_samples,
-        num_test_samples=num_test_samples,
-    )
-    results_file = RESULTS_DIR / f"experiment_{experiment_name}.parquet"
-    results.write_parquet(results_file)
-    logger.info(f"Simulation results written to: {str(results_file.resolve())}")
 
-    name_as_list = pl.col("variable").str.split("_")
-    res = (
-        results.mean()
-        .unpivot()
-        .select(
-            name=pl.col("variable").str.extract(
-                r"^(\w+)_(mse|rmse|mae|bias|duration)_(logit|ratio|ipw|seconds)$"
-            ),
-            scale=name_as_list.list.get(-1),
-            stat=name_as_list.list.get(-2),
-            value=pl.col("value"),
+    with open(MODEL_DIR / model_file) as f:
+        models_dict = yaml.safe_load(f)
+
+    models_dicts = {experiment_name: models_dict}
+
+    # Iterate over multipler_monte_carlo if necessary
+    augmentation_params = models_dict.get("augmentation_params", {})
+    is_sw = augmentation_params.get("function", "") == "augment_stabilized_weights"
+    if is_sw:
+        multipliers = augmentation_params.get("kwargs", {}).get("multipler_monte_carlo")
+        if isinstance(multipliers, list):
+            # create a copy of the models_dict for each multiplier
+
+            def _modified_model_dict(multiplier):
+                md = deepcopy(models_dict)
+                md["augmentation_params"]["kwargs"]["multipler_monte_carlo"] = (
+                    multiplier
+                )
+                return md
+
+            models_dicts = {
+                f"{experiment_name}_mult{m}": _modified_model_dict(m)
+                for m in multipliers
+            }
+
+    for exp_name, md in models_dicts.items():
+        logger.info(f"Running experiment: {exp_name}")
+        results = run_simulations(
+            md,
+            key,
+            num_simulations=num_simulations,
+            num_samples=num_samples,
+            num_test_samples=num_test_samples,
         )
-        .with_columns(value_3sf=pl.col("value").round_sig_figs(3))
-        .sort(["scale", "stat", "value"])
-    )
-    res_file = RESULTS_DIR / f"results_{experiment_name}.parquet"
-    res.write_parquet(res_file)
-    logger.info(f"Simulation results summary written to: {str(res_file.resolve())}")
+        results_file = RESULTS_DIR / f"experiment_{exp_name}.parquet"
+        results.write_parquet(results_file)
+        logger.info(f"Simulation results written to: {str(results_file.resolve())}")
 
-    with pl.Config(tbl_rows=-1):
-        print(res)
+        name_as_list = pl.col("variable").str.split("_")
+        res = (
+            results.mean()
+            .unpivot()
+            .select(
+                name=pl.col("variable").str.extract(
+                    r"^(\w+)_(mse|rmse|mae|bias|duration)_(logit|ratio|ipw|seconds)$"
+                ),
+                scale=name_as_list.list.get(-1),
+                stat=name_as_list.list.get(-2),
+                value=pl.col("value"),
+            )
+            .with_columns(value_3sf=pl.col("value").round_sig_figs(3))
+            .sort(["scale", "stat", "value"])
+        )
+        res_file = RESULTS_DIR / f"results_{exp_name}.parquet"
+        res.write_parquet(res_file)
+        logger.info(f"Simulation results summary written to: {str(res_file.resolve())}")
+
+        with pl.Config(tbl_rows=-1):
+            print(res)
 
 
 def bin_and_mean(x, y, n_bins, bin_type: str = "quantile"):
@@ -365,10 +392,24 @@ def bin_and_mean(x, y, n_bins, bin_type: str = "quantile"):
 def plot(model_file, num_samples, seed: int):
     experiment_name = model_file.removesuffix(".yaml")
     experiment_name = f"{experiment_name}_{num_samples}"
-
     key = jax.random.PRNGKey(seed)
+
+    with open(MODEL_DIR / model_file) as f:
+        models_dict = yaml.safe_load(f)
+
+    augmentation_params = models_dict.get("augmentation_params", {})
+    is_sw = augmentation_params.get("function", "") == "augment_stabilized_weights"
+    if is_sw:
+        multipliers = augmentation_params.get("kwargs", {}).get("multipler_monte_carlo")
+        if isinstance(multipliers, list):
+            # create plots only for the first multiplier value
+            multiplier = multipliers[0]
+            models_dict["augmentation_params"]["kwargs"]["multipler_monte_carlo"] = (
+                multiplier
+            )
+
     truth, preds, stats = run_simulations(
-        MODEL_DIR / model_file,
+        models_dict,
         key,
         num_samples=num_samples,
         num_simulations=1,

@@ -142,7 +142,7 @@ def train_single_mlp(
         )
         sampler = StablilizedWeightSampler(
             train_set,
-            False,
+            replacement=params.get("sampler_replacement", False),
             derangement=params.get("stabilized_weights_derangement", False),
             generator=generator,
         )
@@ -150,7 +150,11 @@ def train_single_mlp(
         train_set = TensorDataset(
             torch.as_tensor(x), torch.as_tensor(y), torch.as_tensor(weights)
         )
-        sampler = RandomSampler(train_set, False, generator=generator)
+        sampler = RandomSampler(
+            train_set,
+            replacement=params.get("sampler_replacement", False),
+            generator=generator,
+        )
 
     loader = DataLoader(train_set, batch_size=batch_size, sampler=sampler)
     nnet = MLP(depth=depth, input_dim=n_features, hidden_dim=width, output_dim=1)
@@ -239,6 +243,10 @@ def train(
         The trained Multi Layer Perceptron.
     """
     tuning = params.get("tuning", False)
+    seed = params.get("seed", None)
+    # Use random seed if None provided.
+    seed = seed or int(torch.empty((), dtype=torch.int64).random_().item())
+
     has_validation = (
         (y_valid is not None) and (x_valid is not None) and (weights_valid is not None)
     )
@@ -247,7 +255,16 @@ def train(
             logger.info("Training MLP without tuning.")
 
         return train_single_mlp(
-            y, x, weights, params, objective, y_valid, x_valid, weights_valid, verbose
+            y,
+            x,
+            weights,
+            params,
+            objective,
+            y_valid,
+            x_valid,
+            weights_valid,
+            verbose,
+            seed,
         )
 
     objective_name = objective.__class__.__name__
@@ -278,7 +295,16 @@ def train(
             "learning_rate": learning_rate,
         }
         nnet = train_single_mlp(
-            y, x, weights, _params, objective, y_valid, x_valid, weights_valid, verbose
+            y,
+            x,
+            weights,
+            _params,
+            objective,
+            y_valid,
+            x_valid,
+            weights_valid,
+            verbose,
+            seed,
         )
         loss = nnet.validation_loss
         trained_models.append((loss, nnet, width, depth, learning_rate))

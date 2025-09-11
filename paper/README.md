@@ -12,15 +12,14 @@ Simulations can be run via the command line as
 
 ```bash
 pixi run paper simulations --model-file shift.yaml
-pixi run paper simulations --model-file stabilized_weights_empirical.yaml
 pixi run paper simulations --model-file stabilized_weights_mc.yaml
-pixi run paper simulations --model-file stabilized_weights_quantile.yaml
+pixi run paper simulations --model-file stabilized_weights_mc_shuffle.yaml
+pixi run paper simulations --model-file stabilized_weights_mc_derange.yaml
 ```
 
-Additionally, example plots for a single run can be created using the command
+To see additional options run `pixi run paper simulations --help`.
+Example plots of predicted vs. fitted values for a single run can be created using the `plot` command, e.g.
 
 ```bash
 pixi run paper plot --model-file shift.yaml --seed 12345
 ```
-
-To see more options for these commands run e.g. `pixi run paper simulations --help`.

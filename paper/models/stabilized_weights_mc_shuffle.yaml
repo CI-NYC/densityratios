@@ -3,8 +3,9 @@ data_generating_process: dgp1_stabilized_weight
 augmentation_params:
   function: augment_stabilized_weights
   kwargs:
-    method: quantile
-    n_quantiles: 100
+    method: monte_carlo_shuffle
+    # Number of monte carlo draws is: n * multipler_monte_carlo
+    multipler_monte_carlo: [1, 5, 10, 20]
 
 # Model parameters
 kde:
@@ -25,29 +26,38 @@ ulsif:
   bandwidths: [1.0, 2.0, 5.0, 10.0]
   smoothing_parameters: [0.0, 0.1, 0.5, 1.0]
 
-lsif:
-  model: kernel
-  method: LSIF
-  # current implementation does not support cross validation
-  basis_dimensions: [500]
-  bandwidths: [10.0]
-  smoothing_parameters: [0.0]
-
 nnet:
   model: nnet
   objective: ["least_squares", "kullback_leibler", "cross_entropy"]
-  depth: 2
-  width: 20
-  learning_rate: 1.0e-4
+  tuning: True
+  depth: [2, 3]
+  width: [20, 50]
+  learning_rate: [1.0e-4]
   num_iterations: 1000
   early_stopping_round: 5
   batch_size: 125
+  stabilized_weights: False
+
+nnet_sw:
+  model: nnet
+  objective: ["least_squares", "kullback_leibler", "cross_entropy"]
+  tuning: True
+  depth: [2, 3]
+  width: [20, 50]
+  learning_rate: [1.0e-4]
+  num_iterations: 1000
+  early_stopping_round: 5
+  batch_size: 125
+  stabilized_weights: True
+  stabilized_weights_derangement: False
+  sampler_replacement: False
 
 booster:
   model: lgb
   objective: ["least_squares", "kullback_leibler", "cross_entropy"]
-  max_leaves: 20
-  learning_rate: 1.0e-3
+  tuning: True
+  max_leaves: [10, 20, 50]
+  learning_rate: [1.0e-3, 1.0e-4]
   num_iterations: 1000
   force_col_wise: True
   early_stopping_round: 10

@@ -3,7 +3,7 @@ data_generating_process: dgp1_stabilized_weight
 augmentation_params:
   function: augment_stabilized_weights
   kwargs:
-    method: monte_carlo
+    method: monte_carlo_derangment
     # Number of monte carlo draws is: n * multipler_monte_carlo
     multipler_monte_carlo: [1, 5, 10, 20]
 
@@ -49,8 +49,8 @@ nnet_sw:
   early_stopping_round: 5
   batch_size: 125
   stabilized_weights: True
-  stabilized_weights_derangement: False
-  sampler_replacement: True
+  stabilized_weights_derangement: True
+  sampler_replacement: False
 
 booster:
   model: lgb
