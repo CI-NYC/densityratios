@@ -1,3 +1,4 @@
+import itertools
 from typing import Any
 
 import jax
@@ -37,6 +38,7 @@ def _loss_lgb(dro: DensityRatioObjective):
 class DensityRatioBooster:
     def __init__(self, booster: lgb.Booster):
         self.booster = booster
+        self.validation_loss = None
 
     def predict(self, x, log: bool = True):
         best_iteration = self.booster.best_iteration
@@ -48,7 +50,7 @@ class DensityRatioBooster:
         return np.exp(preds)
 
 
-def train(
+def train_booster(
     y,
     x,
     weights,
@@ -75,8 +77,9 @@ def train(
     booster : Booster
         The trained Booster model.
     """
-    _params = params.copy()
+    _params = {name: param for name, param in params.items() if param is not None}
     _params.pop("model", None)
+    _params.pop("tuning", None)
     _params["objective"] = _grad_hess_lgb(objective)
     _params["verbose"] = int(verbose)
 
@@ -88,12 +91,12 @@ def train(
         init_score=np.zeros_like(y),
     )
 
-    early_stopping = (
+    has_validation = (
         (y_valid is not None) and (x_valid is not None) and (weights_valid is not None)
     )
-    early_stopping &= params.get("early_stopping", True)
+    early_stopping = has_validation & params.get("early_stopping", True)
 
-    if not early_stopping:
+    if not has_validation:
         booster = lgb.train(_params, train_set)
         return DensityRatioBooster(booster)
 
@@ -106,29 +109,118 @@ def train(
         reference=train_set,
     )
 
-    early_stop = lgb.early_stopping(
-        stopping_rounds=_params.get("early_stopping_round", 1),
-        first_metric_only=True,
-        min_delta=_params.get("early_stopping_min_delta", 0.0),
-        verbose=int(verbose),
-    )
     evals_result = {}
+    callbacks = [lgb.record_evaluation(evals_result)]
+
+    if not early_stopping:
+        early_stop = lgb.early_stopping(
+            stopping_rounds=_params.get("early_stopping_round", 1),
+            first_metric_only=True,
+            min_delta=_params.get("early_stopping_min_delta", 0.0),
+            verbose=int(verbose),
+        )
+        callbacks.append(early_stop)
+
     booster = lgb.train(
         _params,
         train_set,
         valid_sets=[valid_set],
         valid_names=["Validation"],
-        callbacks=[early_stop, lgb.record_evaluation(evals_result)],
+        callbacks=callbacks,
         feval=_loss_lgb(objective),
     )
 
-    if verbose:
-        objective_name = objective.__class__.__name__
-        losses = evals_result["Validation"][objective_name]
+    objective_name = objective.__class__.__name__
+    losses = evals_result["Validation"][objective_name]
+    loss = losses[booster.best_iteration - 1] if early_stopping else losses[-1]
+
+    booster = DensityRatioBooster(booster)
+    booster.validation_loss = loss
+
+    if verbose & early_stopping:
         epoch = len(losses)
-        score = losses[-1]
         logger.info(
-            f"Stopping with on iteration: {epoch} with validation loss ({objective_name}): {score:.4f}."
+            f"Stopping with on iteration: {epoch} with validation loss ({objective_name}): {loss:.4f}."
         )
 
-    return DensityRatioBooster(booster)
+    return booster
+
+
+def train(
+    y,
+    x,
+    weights,
+    params: dict[str, Any],
+    objective: DensityRatioObjective,
+    y_valid=None,
+    x_valid=None,
+    weights_valid=None,
+    verbose: bool = False,
+) -> DensityRatioBooster:
+    """Perform the training with given parameters.
+
+    Optionally uses tuning on a validation set if `tuning=True` is set, and a validation
+    set is provided.
+
+    Parameters
+    ----------
+    y: vector of numerator / denominator labels.
+    x: matrix of predictors.
+    weights: vector of weights.
+    params : dict
+        Parameters for training.
+    objective: training objective.
+
+    Returns
+    -------
+    booster : Booster
+        The trained Booster model.
+    """
+    tuning = params.get("tuning", False)
+    has_validation = (
+        (y_valid is not None) and (x_valid is not None) and (weights_valid is not None)
+    )
+    if not tuning or not has_validation:
+        if verbose:
+            logger.info("Training LightGBM Booster without tuning.")
+
+        return train_booster(
+            y, x, weights, params, objective, y_valid, x_valid, weights_valid, verbose
+        )
+
+    objective_name = objective.__class__.__name__
+    _params = params.copy()
+
+    # extract gird for tuning
+    max_leaves_ = params.get("max_leaves")
+    learning_rates = params.get("learning_rate")
+
+    if not isinstance(max_leaves_, list):
+        max_leaves_ = [max_leaves_]
+
+    if not isinstance(learning_rates, list):
+        learning_rates = [learning_rates]
+
+    trained_models = []
+
+    for max_leaves, learning_rate in itertools.product(max_leaves_, learning_rates):
+        _params = _params | {"max_leaves": max_leaves, "learning_rate": learning_rate}
+        booster = train_booster(
+            y, x, weights, _params, objective, y_valid, x_valid, weights_valid, verbose
+        )
+        loss = booster.validation_loss
+        trained_models.append((loss, booster, max_leaves, learning_rate))
+        if verbose:
+            logger.info(
+                f"Obtained Validation Loss ({objective_name}): {loss:.5f}, using: {max_leaves=}, {learning_rate=}"
+            )
+
+    trained_models = sorted(trained_models, key=lambda x: x[0])
+    loss, booster, max_leaves, learning_rate = trained_models[0]
+
+    if verbose:
+        logger.info(
+            f"Result of Tuning: Best Validation Loss ({objective_name}): {loss:.5f} using: {max_leaves=}, {learning_rate=}"
+        )
+
+    return booster

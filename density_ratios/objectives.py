@@ -81,8 +81,7 @@ class LeastSquares(DensityRatioObjective):
         dr_preds = jnp.exp(raw_predictions)
         dr_preds_sq = jnp.exp(2.0 * raw_predictions)
         grad = jnp.where(delta, -2.0 * dr_preds, 2.0 * dr_preds_sq)
-        # hess = jnp.where(delta, -2.0 * dr_preds, 4.0 * dr_preds_sq)
-        hess = jnp.ones(shape=delta.shape)
+        hess = jnp.where(delta, -2.0 * dr_preds, 4.0 * dr_preds_sq)
 
         if weight is None:
             return np.asarray(grad), np.asarray(hess)
@@ -126,8 +125,7 @@ class KullbackLeibler(DensityRatioObjective):
         delta = jnp.asarray(delta, dtype=np.bool_).squeeze()
         dr_preds = jnp.exp(raw_predictions)
         grad = jnp.where(delta, -1.0, dr_preds)
-        # hess = jnp.where(delta, 0.0, dr_preds)
-        hess = jnp.ones(shape=delta.shape)
+        hess = jnp.where(delta, 0.0, dr_preds)
 
         if weight is None:
             return np.asarray(grad), np.asarray(hess)

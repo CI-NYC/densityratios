@@ -6,6 +6,7 @@ platforms = ["osx-arm64"]
 
 [tasks]
 postinstall = "uv pip install --no-build-isolation --no-deps -e ."
+paper = "python paper/simulations.py"
 
 [dependencies]
 python = "*"
@@ -19,6 +20,7 @@ pyyaml = "*"
 tqdm = "*"
 rich = "*"
 osqp = "*"
+click = "*"
 
 [host-dependencies]
 uv = "*"
