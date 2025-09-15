@@ -31,7 +31,7 @@ pytest-cov = "*"
 pytest-md = "*"
 pytest-emoji = "*"
 [feature.test.tasks]
-test = "pytest"
+test = "pytest tests"
 
 [feature.lint.dependencies]
 pre-commit = "*"
