@@ -311,17 +311,19 @@ def simulations(model_file, num_simulations, num_samples, num_test_samples, seed
                 for m in multipliers
             }
 
-    keys = jax.random.split(key, len(models_dicts))
-
-    for i, (exp_name, md) in enumerate(models_dicts.items()):
+    for exp_name, md in models_dicts.items():
         logger.info(f"Running experiment: {exp_name}")
+        t0 = timeit.default_timer()
         results = run_simulations(
             md,
-            key=keys[i],
+            key=key,
             num_simulations=num_simulations,
             num_samples=num_samples,
             num_test_samples=num_test_samples,
         )
+        duration = timeit.default_timer() - t0
+        duration_mins = duration / 60
+        logger.info(f"Finished experiment with duration: {duration_mins:.0f} minutes.")
         results_file = RESULTS_DIR / f"experiment_{exp_name}.parquet"
         results.write_parquet(results_file)
         logger.info(f"Simulation results written to: {str(results_file.resolve())}")
@@ -344,9 +346,6 @@ def simulations(model_file, num_simulations, num_samples, num_test_samples, seed
         res_file = RESULTS_DIR / f"results_{exp_name}.parquet"
         res.write_parquet(res_file)
         logger.info(f"Simulation results summary written to: {str(res_file.resolve())}")
-
-        with pl.Config(tbl_rows=-1):
-            print(res)
 
 
 def bin_and_mean(x, y, n_bins, bin_type: str = "quantile"):

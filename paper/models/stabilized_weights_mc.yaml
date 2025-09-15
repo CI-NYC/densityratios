@@ -5,7 +5,7 @@ augmentation_params:
   kwargs:
     method: monte_carlo
     # Number of monte carlo draws is: n * multipler_monte_carlo
-    multipler_monte_carlo: [1, 5, 10, 20]
+    multipler_monte_carlo: [1, 2, 5, 10, 20]
 
 # Model parameters
 kde:
