@@ -54,7 +54,7 @@ def dgp1_true_ratio_stabilized_weight(a, x):
 
 
 def dgp1_true_outcome(a, x, key):
-    mu = a.squeeze() + x[..., 0] * x[..., 1] + x[..., 2]
+    mu = a.squeeze() * (1 + jnp.square(x[..., 0])) + x[..., 0] * x[..., 1] + x[..., 2]
     num_samples = len(mu)
     return jax.random.normal(key, shape=(num_samples,)) + mu
 
