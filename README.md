@@ -8,8 +8,8 @@ We use [Pixi](https://pixi.sh/latest/installation/) package manager, which must 
 You can install the `density_ratio` package in development mode using:
 
 ```bash
-git clone https://CI-NYC/densityratios.git
-cd density_ratios
+git clone https://github.com/CI-NYC/densityratios.git
+cd densityratios
 
 pixi run pre-commit-install
 pixi run postinstall
