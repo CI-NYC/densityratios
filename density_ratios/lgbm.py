@@ -194,6 +194,7 @@ def train(
     # extract gird for tuning
     max_leaves_ = params.get("max_leaves")
     learning_rates = params.get("learning_rate")
+    bagging_fractions = params.get("bagging_fraction")
 
     if not isinstance(max_leaves_, list):
         max_leaves_ = [max_leaves_]
@@ -201,26 +202,37 @@ def train(
     if not isinstance(learning_rates, list):
         learning_rates = [learning_rates]
 
+    if not isinstance(bagging_fractions, list):
+        bagging_fractions = [bagging_fractions]
+
     trained_models = []
 
-    for max_leaves, learning_rate in itertools.product(max_leaves_, learning_rates):
-        _params = _params | {"max_leaves": max_leaves, "learning_rate": learning_rate}
+    for max_leaves, learning_rate, bagging_fraction in itertools.product(
+        max_leaves_, learning_rates, bagging_fractions
+    ):
+        _params = _params | {
+            "max_leaves": max_leaves,
+            "learning_rate": learning_rate,
+            "bagging_fraction": bagging_fraction,
+        }
         booster = train_booster(
             y, x, weights, _params, objective, y_valid, x_valid, weights_valid, verbose
         )
         loss = booster.validation_loss
-        trained_models.append((loss, booster, max_leaves, learning_rate))
+        trained_models.append(
+            (loss, booster, max_leaves, learning_rate, bagging_fraction)
+        )
         if verbose:
             logger.info(
-                f"Obtained Validation Loss ({objective_name}): {loss:.5f}, using: {max_leaves=}, {learning_rate=}"
+                f"Obtained Validation Loss ({objective_name}): {loss:.5f}, using: {max_leaves=}, {learning_rate=}, {bagging_fraction=}"
             )
 
     trained_models = sorted(trained_models, key=lambda x: x[0])
-    loss, booster, max_leaves, learning_rate = trained_models[0]
+    loss, booster, max_leaves, learning_rate, bagging_fraction = trained_models[0]
 
     if verbose:
         logger.info(
-            f"Result of Tuning: Best Validation Loss ({objective_name}): {loss:.5f} using: {max_leaves=}, {learning_rate=}"
+            f"Result of Tuning: Best Validation Loss ({objective_name}): {loss:.5f} using: {max_leaves=}, {learning_rate=}, {bagging_fraction=}"
         )
 
     return booster
