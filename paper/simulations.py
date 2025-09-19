@@ -236,6 +236,10 @@ def run_simulations(
     for iteration, k in enumerate(jax.random.split(key, num_simulations)):
         logger.info(f"Starting simulation: {iteration}")
 
+        # Issue when running on EC2 instance after around 20 iterations
+        # See also https://github.com/jax-ml/jax/issues/11923
+        jax.clear_caches()
+
         k_train, k_valid, k_test, k_outcome = jax.random.split(k, 4)
         # Use 80/20 test validation split
         num_train = int(num_samples * 0.8)
