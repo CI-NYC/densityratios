@@ -15,7 +15,9 @@ from density_ratios.augmentation import (
     augment_shift_intervention,
     augment_stabilized_weights,
 )
+from density_ratios.lgbm import train as train_lgb
 from density_ratios.logging import get_logger
+from density_ratios.nnet.model import train as train_nnet
 from density_ratios.objectives import BinaryCrossEntropy, KullbackLeibler, LeastSquares
 from density_ratios.train import train
 
@@ -120,6 +122,66 @@ _dgp_lookup = {
 }
 
 
+def train_propensity(
+    a_train, x_train, model: str, params: dict, a_valid=None, x_valid=None
+):
+    """Train inverse propensity score model.
+
+    For binary outcomes we would like to compare against I(a == 1) / p(a == 1 | x)
+    where p(a == 1 | x) is learned by nnet or boosting.
+    This is not in the main density ratio package so we provide a simple implementation here.
+
+    Parameters
+    ----------
+    a_train: training binary outcomes
+    x_train: predictors
+    model: one of 'nnet-propensity' or 'booster-propensity'
+    params: parameter dictionary to be passed to the fitting algorithm
+
+    Returns
+    -------
+    For easier integration to rest of the simulation runs, the return values is an object
+    with a predict method that returns:
+        log( p(a == 1) ) - log( p(a == 1 | x) )
+    which is mathematically equivalent by Bayes Theorem to:
+        log( p(x) ) - log( p(x | a == 1) )
+    """
+    log_p = np.log(np.mean(a_train))
+
+    if model == "nnet-propensity":
+        train_fn = train_nnet
+    elif model == "lgb-propensity":
+        train_fn = train_lgb
+    else:
+        raise ValueError(f"{model=} not recognized.")
+
+    mod = train_fn(
+        np.asarray(a_train),
+        np.asarray(x_train),
+        weights=np.ones_like(a_train),
+        params=params,
+        objective=BinaryCrossEntropy(),
+        y_valid=np.asarray(a_valid) if a_valid is not None else None,
+        x_valid=np.asarray(x_valid) if x_valid is not None else None,
+        weights_valid=np.ones_like(a_valid) if a_valid is not None else None,
+    )
+    return _Predictor(mod, log_p)
+
+
+class _Predictor:
+    """Helper class for propensity score model predictions"""
+
+    def __init__(self, model, log_p):
+        self.model = model
+        self.log_p = log_p
+
+    def predict(self, x, log=True):
+        preds = self.log_p - self.model.predict(x, log=True)
+        if log:
+            return preds
+        return np.exp(preds)
+
+
 def augment_and_fit(
     a_train,
     x_train,
@@ -203,6 +265,19 @@ def augment_and_fit(
                 duration = timeit.default_timer() - t0
                 out[f"{name}_{obj_name}"] = model.predict(test_data), duration
 
+        elif model_name in ["nnet-propensity", "lgb-propensity"]:
+            t0 = timeit.default_timer()
+            model = train_propensity(
+                a_train,
+                x_train,
+                model_name,
+                params,
+                a_valid,
+                x_valid,
+            )
+            duration = timeit.default_timer() - t0
+            out[name] = model.predict(test_data), duration
+
         else:
             t0 = timeit.default_timer()
             model = train(
@@ -214,7 +289,7 @@ def augment_and_fit(
                 verbose=verbose,
             )
             duration = timeit.default_timer() - t0
-            out[f"{name}"] = model.predict(test_data), duration
+            out[name] = model.predict(test_data), duration
 
     return out
 

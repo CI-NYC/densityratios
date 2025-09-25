@@ -43,3 +43,24 @@ booster:
   num_iterations: 1000
   force_col_wise: True
   early_stopping_round: 10
+
+nnet-propensity:
+  model: nnet-propensity
+  tuning: True
+  depth: [2, 3]
+  width: [20, 40]
+  learning_rate: 1.0e-4
+  num_iterations: 1000
+  early_stopping_round: 5
+  batch_size: 125
+
+booster-propensity:
+  model: lgb-propensity
+  tuning: True
+  max_leaves: [10, 20, 50]
+  learning_rate: [1.0e-3, 1.0e-4]
+  bagging_fraction: [0.8, null]
+  bagging_freq: 1
+  num_iterations: 1000
+  force_col_wise: True
+  early_stopping_round: 10
