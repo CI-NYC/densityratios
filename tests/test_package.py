@@ -145,14 +145,14 @@ def test_kernel_training(augmented_data, test_data, method):
     assert preds.shape == (len(a),)
 
 
-@pytest.mark.parametrize("stabilized_weight", [True, False])
-def test_kde_training(augmented_data, test_data, stabilized_weight):
+@pytest.mark.parametrize("method", [None, "stabilized_weight", "shift"])
+def test_kde_training(augmented_data, test_data, method):
     delta, x_augmented, w_augmented = augmented_data
     model = train_kde(
         y=delta,
         x=x_augmented,
         weights=w_augmented,
-        params={"stabilized_weight": stabilized_weight},
+        params={"method": method, "shift_size": 0.1},
     )
     a, x = test_data
     preds = model.predict(np.column_stack([a, x]))
