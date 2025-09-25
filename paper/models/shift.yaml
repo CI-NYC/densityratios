@@ -8,6 +8,8 @@ augmentation_params:
 # Model parameters
 kde:
   model: kde
+  method: shift
+  shift_size: 0.1
 
 kliep:
   model: kernel

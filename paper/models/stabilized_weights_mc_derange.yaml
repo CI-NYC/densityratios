@@ -10,7 +10,7 @@ augmentation_params:
 # Model parameters
 kde:
   model: kde
-  stabilized_weight: True
+  method: stabilized_weight
 
 kliep:
   model: kernel
