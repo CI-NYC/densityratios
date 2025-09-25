@@ -5,6 +5,7 @@ import pytest
 import torch
 
 from density_ratios.augmentation import (
+    augment_binary,
     augment_shift_intervention,
     augment_stabilized_weights,
 )
@@ -61,6 +62,17 @@ def augmented_data(train_data):
     return augment_stabilized_weights(
         x, a, method="monte_carlo", multipler_monte_carlo=2.0
     )
+
+
+def test_augment_binary(train_data):
+    a, x = train_data
+    a = a > 10  # Construct a binary outcome for testing
+    delta, x_augmented, w_augmented = augment_binary(x, a)
+    num_out = len(delta)
+    num_features = x.shape[1]
+
+    assert x_augmented.shape == (num_out, num_features)
+    assert w_augmented.shape == delta.shape == (num_out,)
 
 
 @pytest.mark.parametrize(

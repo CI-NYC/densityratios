@@ -6,6 +6,16 @@ from jax import Array
 from jax.typing import ArrayLike
 
 
+def _get_weights(delta):
+    # TODO: allow weights to be passed in
+    n1 = np.sum(delta, dtype=np.float32)
+    n0 = len(delta) - n1
+
+    w = np.where(delta, n0, n1)
+    w /= np.sum(w)
+    return w
+
+
 def _postprocess_augmented_data(
     arrs_augmented: list[list[ArrayLike]],
 ) -> tuple[Array, Array, Array]:
@@ -16,13 +26,7 @@ def _postprocess_augmented_data(
     a = np.concatenate([arr[1].squeeze() for arr in arrs_augmented], axis=0)
     x = np.concatenate([arr[2] for arr in arrs_augmented], axis=0)
 
-    n1 = np.sum(delta, dtype=np.float32)
-    n0 = len(delta) - n1
-
-    # TODO: allow weights to be passed in
-    w = np.where(delta, n0, n1)
-    w /= np.sum(w)
-
+    w = _get_weights(delta)
     return delta, np.column_stack([a, x]), w
 
 
@@ -216,6 +220,35 @@ def augment_shift_intervention(
     weights
     """
     return augment_policy_intervention(x, a, a + shift_size, weight)
+
+
+def augment_binary(
+    x: ArrayLike,
+    a: ArrayLike,
+    weight: ArrayLike | None = None,
+) -> tuple[Array, Array, Array]:
+    """Augment dataset for inverse propensity score learning.
+
+    For estimating the ratio: p(x) / p(x | a == 1)
+
+    Parameters
+    ----------
+    tuple containing:
+    numerator/demonionator indicator
+    predictor matrix consisting of x
+    weights
+    """
+    new_x = x[np.asarray(a).squeeze() == 1, :]
+    arrs_augmented = [
+        [np.zeros(shape=(new_x.shape[0], 1), dtype=np.bool), new_x],
+        [np.ones_like(a, dtype=np.bool), x],
+    ]
+    delta = np.concatenate(
+        [arr[0].squeeze() for arr in arrs_augmented], axis=0, dtype=np.bool
+    )
+    x_out = np.concatenate([arr[1] for arr in arrs_augmented], axis=0)
+    w = _get_weights(delta)
+    return delta, x_out, w
 
 
 def _derangment(key, n):
