@@ -226,10 +226,14 @@ def augment_binary(
     x: ArrayLike,
     a: ArrayLike,
     weight: ArrayLike | None = None,
+    method: str = "marginal",
 ) -> tuple[Array, Array, Array]:
     """Augment dataset for inverse propensity score learning.
 
-    For estimating the ratio: p(x) / p(x | a == 1)
+    When method is 'marginal' output is augmented data for estimating the ratio:
+        p(x) / p(x | a == 0)
+    When method is 'conditional' output is augmented data for estimating the ratio:
+        p(x | a == 1) / p(x | a == 0)
 
     Parameters
     ----------
@@ -238,11 +242,16 @@ def augment_binary(
     predictor matrix consisting of x
     weights
     """
-    new_x = x[np.asarray(a).squeeze() == 1, :]
-    arrs_augmented = [
-        [np.zeros(shape=(new_x.shape[0], 1), dtype=np.bool), new_x],
-        [np.ones_like(a, dtype=np.bool), x],
-    ]
+    if method == "marginal":
+        x0 = x[np.asarray(a).squeeze() == 0, :]
+        arrs_augmented = [
+            [np.zeros(shape=(x0.shape[0], 1), dtype=np.bool), x0],
+            [np.ones_like(a, dtype=np.bool), x],
+        ]
+
+    if method == "conditional":
+        arrs_augmented = [[np.asarray(a, dtype=np.bool), x]]
+
     delta = np.concatenate(
         [arr[0].squeeze() for arr in arrs_augmented], axis=0, dtype=np.bool
     )

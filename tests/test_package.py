@@ -64,10 +64,11 @@ def augmented_data(train_data):
     )
 
 
-def test_augment_binary(train_data):
+@pytest.mark.parametrize("method", ["marginal", "conditional"])
+def test_augment_binary(train_data, method):
     a, x = train_data
     a = a > 10  # Construct a binary outcome for testing
-    delta, x_augmented, w_augmented = augment_binary(x, a)
+    delta, x_augmented, w_augmented = augment_binary(x, a, method=method)
     num_out = len(delta)
     num_features = x.shape[1]
 
