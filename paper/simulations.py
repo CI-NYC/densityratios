@@ -11,6 +11,7 @@ import polars as pl
 import yaml
 
 from density_ratios.augmentation import (
+    augment_binary,
     augment_shift_intervention,
     augment_stabilized_weights,
 )
@@ -63,10 +64,41 @@ def dgp1_true_outcome(a, x, key):
     return jax.random.normal(key, shape=(num_samples,)) + mu
 
 
+def dgp2_propensity_score(x):
+    logit_ps = x[..., 0]
+    return jax.nn.sigmoid(logit_ps).squeeze()
+
+
+def dgp2(key, num_samples, num_features=20):
+    x = jax.random.normal(key, shape=(num_samples, num_features))
+    a = jax.random.bernoulli(key, dgp2_propensity_score(x))
+    return a.reshape((-1, 1)), x
+
+
+def dgp2_true_ratio_policy(a, x):
+    # I(a == 1) / p(a == 1 | x)
+    return jnp.where(a.squeeze(), 1 / dgp2_propensity_score(x), 0.0)
+
+
+def dgp2_true_outcome(a, x, key):
+    mu = a.squeeze() * (1 + x[..., 0]) + x[..., 0] * x[..., 1] + x[..., 2]
+    num_samples = len(mu)
+    return jax.random.normal(key, shape=(num_samples,)) + mu
+
+
+def binary_prediction_augmentation(preds, a_test, a_mean):
+    # Binary prediction methods learn the function: p(x) / p(x | a == 1)
+    # We want to transform this to: I(a == 1) p(x) / p(a, x)
+    # This is achieved by multiplying predictions by I(a == 1) / p(a == 1)
+    # where p(a == 1) is provided
+    return jnp.where(a_test.squeeze(), preds / a_mean, 0.0)
+
+
 # Function look up dict
 _augmentation_funcs = {
     "augment_shift_intervention": augment_shift_intervention,
     "augment_stabilized_weights": augment_stabilized_weights,
+    "augment_binary": lambda x, a, w=None: augment_binary(x, 1 - a, w),
 }
 
 _dgp_lookup = {
@@ -79,6 +111,11 @@ _dgp_lookup = {
         "dgp": dgp1,
         "true_ratio": dgp1_true_ratio_stabilized_weight,
         "true_outcome": dgp1_true_outcome,
+    },
+    "dgp2_binary": {
+        "dgp": dgp2,
+        "true_ratio": dgp2_true_ratio_policy,
+        "true_outcome": dgp2_true_outcome,
     },
 }
 
@@ -93,6 +130,7 @@ def augment_and_fit(
     augmentation_params: dict,
     param_set: dict[str, dict] | None = None,
     verbose: bool = False,
+    exclude_treatment: bool = False,
 ):
     param_set = param_set or {}
 
@@ -121,7 +159,10 @@ def augment_and_fit(
         **augmentation_func_kwargs,
     )
 
-    test_data = np.column_stack([a_test, x_test])
+    if exclude_treatment:
+        test_data = x_test
+    else:
+        test_data = np.column_stack([a_test, x_test])
 
     out = {"ones": (np.zeros(len(test_data)), 0.0)}  # log(1) = 0 as baseline
     objectives = {
@@ -178,9 +219,9 @@ def augment_and_fit(
     return out
 
 
-def evaluations(true_logits, pred_logits, true_y=None) -> dict:
-    diff_logit = pred_logits - true_logits
-    diff_ratio = np.exp(pred_logits) - np.exp(true_logits)
+def evaluations(true_ratios, pred_ratios, true_y=None) -> dict:
+    diff_logit = np.log(pred_ratios) - np.log(true_ratios)
+    diff_ratio = pred_ratios - true_ratios
     out = {
         "rmse_logit": np.sqrt(np.mean(np.square(diff_logit))),
         "rmse_ratio": np.sqrt(np.mean(np.square(diff_ratio))),
@@ -196,12 +237,12 @@ def evaluations(true_logits, pred_logits, true_y=None) -> dict:
 
 
 def evaluate_mulitple_predictions(
-    true_logits, pred_dict: dict[str, tuple], true_y=None
+    true_ratios, pred_dict: dict[str, tuple], true_y=None
 ) -> dict:
     stats = {
         f"{name}_{stat_name}": stat
         for name, (pred, duration) in pred_dict.items()
-        for stat_name, stat in evaluations(true_logits, pred, true_y).items()
+        for stat_name, stat in evaluations(true_ratios, pred, true_y).items()
     }
     durations = {
         f"{name}_duration_seconds": duration
@@ -224,6 +265,10 @@ def run_simulations(
     )
 
     augmentation_params = models_dict.pop("augmentation_params", {})
+
+    # In the binary treatment setting, we experiment with a procedure that learns the
+    # density ratio without treatment. This requires a couple of modifications
+    is_binary = augmentation_params.get("function", "") == "augment_binary"
 
     dgp_name = models_dict.pop("data_generating_process", "")
     _dgp = _dgp_lookup.get(dgp_name, None)
@@ -264,16 +309,29 @@ def run_simulations(
             augmentation_params,
             param_set=param_set,
             verbose=verbose,
+            exclude_treatment=is_binary,
         )
-        stats = evaluate_mulitple_predictions(
-            np.log(true_ratios), pred_ratios_logit, true_y
-        )
+
+        # convert logits to ratios
+        pred_ratios = {
+            name: (jnp.exp(pred), duration)
+            for name, (pred, duration) in pred_ratios_logit.items()
+        }
+
+        if is_binary:
+            a_mean = jnp.mean(a_train)
+            pred_ratios = {
+                name: (binary_prediction_augmentation(pred, a_test, a_mean), duration)
+                for name, (pred, duration) in pred_ratios.items()
+            }
+
+        stats = evaluate_mulitple_predictions(true_ratios, pred_ratios, true_y)
         outputs.append(stats)
 
         # little hack for test plotting
         # todo: remove?
         if num_simulations == 1:
-            return true_ratios, pred_ratios_logit, stats
+            return true_ratios, pred_ratios, stats
 
     return pl.from_records(outputs)
 
@@ -432,7 +490,7 @@ def plot(model_file, num_samples, seed: int):
     n_bins = 15
     bin_type = "linear_y"
     bin_preds = {
-        name: bin_and_mean(np.exp(pred), truth, n_bins, bin_type)
+        name: bin_and_mean(pred, truth, n_bins, bin_type)
         for name, (pred, _) in preds.items()
     }
 
