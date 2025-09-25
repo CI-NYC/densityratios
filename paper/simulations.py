@@ -24,17 +24,21 @@ MODEL_DIR = Path("paper/models")
 RESULTS_DIR = Path("results")
 
 
+def dgp1_treatment_mean(x, c=0.5):
+    # E[A|X]
+    return c * x[..., 0]
+
+
 def dgp1(key, num_samples, num_features=20):
-    c = 0.5
     x = jax.random.normal(key, shape=(num_samples, num_features))
-    a = jax.random.normal(key, shape=(num_samples,)) + c * x[..., 0]
+    a = jax.random.normal(key, shape=(num_samples,)) + dgp1_treatment_mean(x)
     return a.reshape((-1, 1)), x
 
 
 def dgp1_true_ratio_shift(a, x, shift_size: float = 0.1):
     """True ratio function for shift intervention."""
     # p(a - shift | x) / p(a | x)
-    a_residual = a.squeeze() - x[..., 0]  # - np.maximum(x[..., 1], 0)  # a - E[A|X]
+    a_residual = a.squeeze() - dgp1_treatment_mean(x)
     log_a_cond = jax.scipy.stats.norm.logpdf(a_residual)
     log_a_cond_shifted = jax.scipy.stats.norm.logpdf(a_residual - shift_size)
     return jnp.exp(log_a_cond_shifted - log_a_cond)
@@ -44,7 +48,7 @@ def dgp1_true_ratio_stabilized_weight(a, x):
     """True ratio function."""
     # p(a) / p(a | x)
     c = 0.5
-    a_residual = a.squeeze() - c * x[..., 0]
+    a_residual = a.squeeze() - dgp1_treatment_mean(x, c)
     log_a_cond = jax.scipy.stats.norm.logpdf(a_residual)
     marginal_var = 1 + jnp.square(c)
     log_a_marginal = jax.scipy.stats.norm.logpdf(
@@ -54,7 +58,7 @@ def dgp1_true_ratio_stabilized_weight(a, x):
 
 
 def dgp1_true_outcome(a, x, key):
-    mu = a.squeeze() * (1 + jnp.square(x[..., 0])) + x[..., 0] * x[..., 1] + x[..., 2]
+    mu = a.squeeze() * (1 + x[..., 0]) + x[..., 0] * x[..., 1] + x[..., 2]
     num_samples = len(mu)
     return jax.random.normal(key, shape=(num_samples,)) + mu
 
@@ -127,6 +131,7 @@ def augment_and_fit(
     }
 
     for name, params in param_set.items():
+        jax.clear_caches()
         model_name = params.get("model")
         objective = params.get("objective", None)
 
@@ -235,6 +240,10 @@ def run_simulations(
 
     for iteration, k in enumerate(jax.random.split(key, num_simulations)):
         logger.info(f"Starting simulation: {iteration}")
+
+        # Issue when running on EC2 instance after around 20 iterations
+        # See also https://github.com/jax-ml/jax/issues/11923
+        jax.clear_caches()
 
         k_train, k_valid, k_test, k_outcome = jax.random.split(k, 4)
         # Use 80/20 test validation split
