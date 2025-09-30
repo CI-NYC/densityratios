@@ -67,7 +67,7 @@ def dgp1_true_outcome(a, x, key):
 
 
 def dgp2_propensity_score(x):
-    logit_ps = x[..., 0]
+    logit_ps = jnp.abs(x[..., 0]) + (1 - 0.5 * x[..., 1]) * x[..., 2]
     return jax.nn.sigmoid(logit_ps).squeeze()
 
 
