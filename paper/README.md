@@ -11,6 +11,7 @@ The directory is organized as:
 Simulations can be run via the command line as
 
 ```bash
+pixi run paper simulations --model-file binary.yaml
 pixi run paper simulations --model-file shift.yaml
 pixi run paper simulations --model-file stabilized_weights_mc.yaml
 pixi run paper simulations --model-file stabilized_weights_mc_shuffle.yaml
