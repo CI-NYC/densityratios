@@ -6,18 +6,19 @@ from jax import Array
 from jax.typing import ArrayLike
 
 
-def _get_weights(delta):
-    # TODO: allow weights to be passed in
-    n1 = np.sum(delta, dtype=np.float32)
-    n0 = len(delta) - n1
+def _get_weights(delta, weights=None):
+    if weights is None:
+        n1 = np.sum(delta, dtype=np.float32)
+        n0 = len(delta) - n1
+        return np.where(delta, 1 / (2 * n1), 1 / (2 * n0))
 
-    w = np.where(delta, n0, n1)
-    w /= np.sum(w)
-    return w
+    w1 = np.sum(weights[delta])
+    w0 = np.sum(weights[~delta])
+    return weights / np.where(delta, 2 * w1, 2 * w0)
 
 
 def _postprocess_augmented_data(
-    arrs_augmented: list[list[ArrayLike]],
+    arrs_augmented: list[list[ArrayLike]], has_weights: bool = False
 ) -> tuple[Array, Array, Array]:
     """Postprocess augmented data."""
     delta = np.concatenate(
@@ -26,7 +27,12 @@ def _postprocess_augmented_data(
     a = np.concatenate([arr[1].squeeze() for arr in arrs_augmented], axis=0)
     x = np.concatenate([arr[2] for arr in arrs_augmented], axis=0)
 
-    w = _get_weights(delta)
+    if not has_weights:
+        w = _get_weights(delta)
+        return delta, np.column_stack([a, x]), w
+
+    weights = np.concatenate([arr[3].squeeze() for arr in arrs_augmented], axis=0)
+    w = _get_weights(delta, weights)
     return delta, np.column_stack([a, x]), w
 
 
@@ -44,7 +50,7 @@ def augment_stabilized_weights(
     ----------
     x: predictor matrix.
     a: treatment vector.
-    weight: optional observation weight vector.
+    weight: optional observation weight vector.  TODO: Currently this is ignored.
     method: which method to use.
     multipler_monte_carlo: how big the monte-carlo sample should be,
         Used only when method is 'monte_carlo'.
@@ -67,12 +73,14 @@ def augment_stabilized_weights(
         "monte_carlo_shuffle",
         "monte_carlo_derangment",
         "split_sample",
+        "binary",
     ]
     if method not in allowed_methods:
         raise ValueError(f"{method=} not supported. Choose from {allowed_methods}.")
 
     arrs_augmented = []
     num_samples = x.shape[0]
+    has_weights = False  # whether augmentation scheme uses weights
 
     if method == "quantile":
         n_quantiles = int(multipler_monte_carlo)
@@ -163,7 +171,35 @@ def augment_stabilized_weights(
             ]
         )
 
-    return _postprocess_augmented_data(arrs_augmented)
+    if method == "binary":
+        has_weights = True
+        a_mean = np.mean(a, dtype=np.float32)
+        arrs_augmented.append(
+            [
+                np.zeros_like(a, dtype=np.bool),  # D
+                a,  # A
+                x,  # X
+                np.ones_like(a, dtype=np.float32),  # weights
+            ]
+        )
+        arrs_augmented.append(
+            [
+                np.ones_like(a, dtype=np.bool),  # D
+                np.ones_like(a, dtype=np.bool),  # A
+                x,  # X
+                np.broadcast_to(a_mean, a.shape),  # weights,
+            ]
+        )
+        arrs_augmented.append(
+            [
+                np.ones_like(a, dtype=np.bool),  # D
+                np.zeros_like(a, dtype=np.bool),  # A
+                x,  # X
+                np.broadcast_to(1 - a_mean, a.shape),  # weights,
+            ]
+        )
+
+    return _postprocess_augmented_data(arrs_augmented, has_weights)
 
 
 def augment_policy_intervention(

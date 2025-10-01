@@ -84,11 +84,16 @@ def test_augment_binary(train_data, method):
         "monte_carlo_shuffle",
         "monte_carlo_derangment",
         "split_sample",
+        "binary",
     ],
 )
 def test_augment_stabilized_weights(train_data, method):
     """Test that the package can be imported."""
     a, x = train_data
+
+    if method == "binary":
+        a = a > 10  # Construct a binary outcome for testing
+
     delta, x_augmented, w_augmented = augment_stabilized_weights(
         x, a, method=method, multipler_monte_carlo=2
     )
@@ -97,6 +102,7 @@ def test_augment_stabilized_weights(train_data, method):
 
     assert x_augmented.shape == (num_out, num_features + 1)
     assert w_augmented.shape == delta.shape == (num_out,)
+    assert np.abs(np.sum(w_augmented) - 1.0) <= 1.0e-6
 
 
 def test_augment_shift_intervention(train_data):
