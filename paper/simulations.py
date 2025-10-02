@@ -18,7 +18,12 @@ from density_ratios.augmentation import (
 from density_ratios.lgbm import train as train_lgb
 from density_ratios.logging import get_logger
 from density_ratios.nnet.model import train as train_nnet
-from density_ratios.objectives import BinaryCrossEntropy, KullbackLeibler, LeastSquares
+from density_ratios.objectives import (
+    BinaryCrossEntropy,
+    ItakuraSaito,
+    KullbackLeibler,
+    LeastSquares,
+)
 from density_ratios.train import train
 
 logger = get_logger(__name__)
@@ -231,6 +236,7 @@ def augment_and_fit(
         "least_squares": LeastSquares(),
         "kullback_leibler": KullbackLeibler(),
         "cross_entropy": BinaryCrossEntropy(),
+        "itakura_saito": ItakuraSaito(),
     }
 
     for name, params in param_set.items():

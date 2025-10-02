@@ -23,7 +23,7 @@ ulsif:
 
 nnet:
   model: nnet
-  objective: ["least_squares", "kullback_leibler", "cross_entropy"]
+  objective: ["least_squares", "kullback_leibler", "cross_entropy", "itakura_saito"]
   tuning: True
   depth: [2, 3]
   width: [20, 40]
@@ -34,7 +34,7 @@ nnet:
 
 booster:
   model: lgb
-  objective: ["least_squares", "kullback_leibler", "cross_entropy"]
+  objective: ["least_squares", "kullback_leibler", "cross_entropy", "itakura_saito"]
   tuning: True
   max_leaves: [10, 20, 50]
   learning_rate: [1.0e-3, 1.0e-4]
