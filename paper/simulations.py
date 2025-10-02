@@ -126,6 +126,13 @@ _dgp_lookup = {
     },
 }
 
+objectives_lookup = {
+    "least_squares": LeastSquares(),
+    "kullback_leibler": KullbackLeibler(),
+    "cross_entropy": BinaryCrossEntropy(),
+    "itakura_saito": ItakuraSaito(),
+}
+
 
 def train_propensity(
     a_train, x_train, model: str, params: dict, a_valid=None, x_valid=None
@@ -232,12 +239,6 @@ def augment_and_fit(
         test_data = np.column_stack([a_test, x_test])
 
     out = {"ones": (np.zeros(len(test_data)), 0.0)}  # log(1) = 0 as baseline
-    objectives = {
-        "least_squares": LeastSquares(),
-        "kullback_leibler": KullbackLeibler(),
-        "cross_entropy": BinaryCrossEntropy(),
-        "itakura_saito": ItakuraSaito(),
-    }
 
     for name, params in param_set.items():
         jax.clear_caches()
@@ -249,7 +250,7 @@ def augment_and_fit(
 
         if isinstance(objective, list):
             for obj_name in objective:
-                obj = objectives.get(obj_name)
+                obj = objectives_lookup.get(obj_name)
                 if obj is None:
                     raise ValueError(f"Objective {obj_name} not found.")
 
