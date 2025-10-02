@@ -16,10 +16,16 @@ from density_ratios.nnet.samplers import (
     StablilizedWeightDataset,
     StablilizedWeightSampler,
 )
-from density_ratios.objectives import BinaryCrossEntropy, KullbackLeibler, LeastSquares
+from density_ratios.objectives import (
+    BinaryCrossEntropy,
+    ItakuraSaito,
+    KullbackLeibler,
+    LeastSquares,
+)
 
 BOOSTER_PARAMS = {}
 NNET_PARAMS = {}
+TEST_OBJECTIVES = [BinaryCrossEntropy, KullbackLeibler, LeastSquares, ItakuraSaito]
 
 
 @pytest.fixture()
@@ -97,9 +103,7 @@ def test_augment_shift_intervention(train_data):
     assert w_augmented.shape == delta.shape == (num_out,)
 
 
-@pytest.mark.parametrize(
-    "objective", [BinaryCrossEntropy, KullbackLeibler, LeastSquares]
-)
+@pytest.mark.parametrize("objective", TEST_OBJECTIVES)
 def test_lgbm_training(augmented_data, test_data, objective):
     delta, x_augmented, w_augmented = augmented_data
     booster = train_lgb(
@@ -114,9 +118,7 @@ def test_lgbm_training(augmented_data, test_data, objective):
     assert preds.shape == (len(a),)
 
 
-@pytest.mark.parametrize(
-    "objective", [BinaryCrossEntropy, KullbackLeibler, LeastSquares]
-)
+@pytest.mark.parametrize("objective", TEST_OBJECTIVES)
 def test_nnet_training(augmented_data, test_data, objective):
     delta, x_augmented, w_augmented = augmented_data
     nnet = train_nnet(
@@ -159,9 +161,7 @@ def test_kde_training(augmented_data, test_data, method):
     assert preds.shape == (len(a),)
 
 
-@pytest.mark.parametrize(
-    "objective", [BinaryCrossEntropy, KullbackLeibler, LeastSquares]
-)
+@pytest.mark.parametrize("objective", TEST_OBJECTIVES)
 def test_torch_jax_losses(objective):
     # test Jax implementation and pytorch implementations agree
     key = jax.random.PRNGKey(112358)
@@ -178,9 +178,7 @@ def test_torch_jax_losses(objective):
     assert jnp.abs(loss_jax - loss_torch) <= 1.0e-6
 
 
-@pytest.mark.parametrize(
-    "objective", [BinaryCrossEntropy, KullbackLeibler, LeastSquares]
-)
+@pytest.mark.parametrize("objective", TEST_OBJECTIVES)
 def test_losses_grad(objective):
     # test derivative code agrees with auto diff
     key = jax.random.PRNGKey(112358)
