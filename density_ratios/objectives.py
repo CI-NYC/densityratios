@@ -134,6 +134,50 @@ class KullbackLeibler(DensityRatioObjective):
         return w * jnp.asarray(grad), w * jnp.asarray(hess)
 
 
+class ItakuraSaito(DensityRatioObjective):
+    def loss(
+        self,
+        raw_predictions: ArrayLike,
+        delta: ArrayLike,
+        weight: ArrayLike | None = None,
+    ) -> Array:
+        """Calculate the least squares loss."""
+        raw_predictions = jnp.asarray(raw_predictions).squeeze()
+        delta = jnp.asarray(delta).squeeze()
+        losses = jnp.where(delta, jnp.exp(-raw_predictions), raw_predictions)
+        return jnp.average(losses, weights=weight)
+
+    def loss_torch(
+        self,
+        raw_predictions,
+        delta,
+        weight=None,
+    ):
+        raw_predictions = torch.as_tensor(raw_predictions).squeeze()
+        delta = torch.as_tensor(delta, dtype=torch.bool).squeeze()
+        losses = torch.where(delta, torch.exp(-raw_predictions), raw_predictions)
+        if weight is not None:
+            weight = torch.as_tensor(weight, dtype=losses.dtype).squeeze()
+            return torch.sum(losses * weight) / torch.sum(weight)
+        return torch.mean(losses)
+
+    def grad_hess(
+        self, y: ArrayLike, delta: ArrayLike, weight: ArrayLike | None = None
+    ) -> tuple[Array, Array]:
+        """Calculate the gradient and Hessian."""
+        raw_predictions = jnp.asarray(y).squeeze()
+        delta = jnp.asarray(delta, dtype=np.bool_).squeeze()
+        inv_dr_preds = jnp.exp(-raw_predictions)
+        grad = jnp.where(delta, -inv_dr_preds, 1.0)
+        hess = jnp.where(delta, inv_dr_preds, 0.0)
+
+        if weight is None:
+            return np.asarray(grad), np.asarray(hess)
+
+        w = jnp.asarray(weight) / jnp.sum(weight)
+        return w * jnp.asarray(grad), w * jnp.asarray(hess)
+
+
 class BinaryCrossEntropy(DensityRatioObjective):
     def loss(
         self,
