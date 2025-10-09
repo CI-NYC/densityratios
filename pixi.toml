@@ -21,6 +21,7 @@ tqdm = "*"
 rich = "*"
 osqp = "*"
 click = "*"
+vl-convert-python = "*"
 
 [host-dependencies]
 uv = "*"
