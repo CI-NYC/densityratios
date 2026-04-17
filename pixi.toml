@@ -1,4 +1,4 @@
-[project]
+[workspace]
 name = "density_ratios"
 description = "Package to estimate density ratios."
 channels = ["conda-forge"]
@@ -22,9 +22,8 @@ rich = "*"
 osqp = "*"
 click = "*"
 vl-convert-python = "*"
-
-[host-dependencies]
 uv = "*"
+
 
 [feature.test.dependencies]
 pytest = "*"
