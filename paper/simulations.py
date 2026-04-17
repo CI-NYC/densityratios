@@ -168,14 +168,14 @@ def train_propensity(
         raise ValueError(f"{model=} not recognized.")
 
     mod = train_fn(
-        np.asarray(a_train),
+        np.asarray(a_train).squeeze(),
         np.asarray(x_train),
-        weights=np.ones_like(a_train),
+        weights=np.ones_like(a_train).squeeze(),
         params=params,
         objective=BinaryCrossEntropy(),
-        y_valid=np.asarray(a_valid) if a_valid is not None else None,
+        y_valid=np.asarray(a_valid).squeeze() if a_valid is not None else None,
         x_valid=np.asarray(x_valid) if x_valid is not None else None,
-        weights_valid=np.ones_like(a_valid) if a_valid is not None else None,
+        weights_valid=np.ones_like(a_valid).squeeze() if a_valid is not None else None,
     )
     return _Predictor(mod, log_p)
 

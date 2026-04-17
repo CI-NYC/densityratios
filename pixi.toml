@@ -1,15 +1,16 @@
-[project]
+[workspace]
 name = "density_ratios"
 description = "Package to estimate density ratios."
 channels = ["conda-forge"]
 platforms = ["linux-64", "osx-arm64", "osx-64"]
 
 [tasks]
-postinstall = "uv pip install --no-build-isolation --no-deps -e ."
+postinstall = "pip install --no-build-isolation --no-deps -e ."
 paper = "python paper/simulations.py"
 
 [dependencies]
 python = "*"
+pip = "*"
 numpy = "*"
 jax = "*"
 lightgbm = "*"
@@ -21,9 +22,8 @@ tqdm = "*"
 rich = "*"
 osqp = "*"
 click = "*"
+vl-convert-python = "*"
 
-[host-dependencies]
-uv = "*"
 
 [feature.test.dependencies]
 pytest = "*"
