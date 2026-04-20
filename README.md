@@ -1,19 +1,30 @@
 # Density Ratios
 
-Python package to estimate density ratios in causal inference using Bregman divergences.
+Python package and R package to estimate density ratios in causal inference using Bregman divergences.
 
-## Development
+## Python package
 
-We use [Pixi](https://pixi.sh/latest/installation/) package manager, which must be installed manually.
+For development we use [Pixi](https://pixi.sh/latest/installation/) package manager, which must be installed manually.
 You can install the `density_ratio` package in development mode using:
 
 ```bash
-git clone https://github.com/CI-NYC/densityratios.git
-cd densityratios
-
 pixi run pre-commit-install
 pixi run postinstall
 pixi run test
+```
+
+## R package
+
+The R package is a light weight package which provides a `density_ratio_family` function
+for density ratio modeling.
+To install and view documentation run the following in R
+
+```r
+devtools::install('R-package')
+
+library(densityratios)
+
+?density_ratio_family
 ```
 
 ## Related Software
