@@ -220,19 +220,13 @@ link_stats <- function(link, sharpness) {
 
 # Bregman divergence on the probability scale:
 #   variance V(p) = (1 - p)^3 / F''(p/(1-p))
-#   dev.resids    = 2 * wt * d_F_tilde(y, mu)
-# where F_tilde(t) = (1 - t) F(t/(1 - t)) is the transformed generating
+#   dev.resids    = 2 * wt * {-F_tilde(mu) - F_tilde'(mu)(y - mu)}
+# where F_tilde(t) = (1 - t) F(t/(1 - t))
 family_stats <- function(family) {
     if (family == "least-squares") {
         list(
             variance = function(p) (1 - p)^3,
             dev.resids = function(y, mu, wt) {
-                # 2 * (-F_tilde(mu) - F_tilde'(mu) * (y - mu)) for
-                # F_tilde(t) = t^2 / (2 (1 - t)). This is the Bregman divergence
-                # minus the y-only constant 2 * F_tilde(y), so is finite at
-                # y = 1 (where the true Bregman is +infinity) and is equal to
-                # the Bregman up to an additive function of y, making it valid
-                # as a glm deviance for optimisation.
                 wt * (mu^2 * (1 + y) - 2 * mu * y) / (1 - mu)^2
             }
         )
