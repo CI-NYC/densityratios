@@ -1,0 +1,21 @@
+Package: densityratios
+Type: Package
+Title: Bregman-Riesz Regression for Density-Ratio Learning
+Version: 0.1.0
+Authors@R: c(
+    person("Oliver J.", "Hines", role = c("aut", "cre"), email = "query@ohines.com"),
+    person("Caleb H.", "Miles", role = "aut"))
+Description: Provides a 'family' objects for fitting density-ratio models
+    via Bregman-Riesz regression, as described in Hines and Miles (2026).
+License: MIT + file LICENSE
+Encoding: UTF-8
+Depends: R (>= 4.0.0)
+Imports: stats
+Suggests:
+    testthat (>= 3.0.0),
+    glmnet (>= 4.1),
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
+Config/testthat/edition: 3
+RoxygenNote: 7.3.3
